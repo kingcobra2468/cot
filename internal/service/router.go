@@ -11,6 +11,11 @@ type Router struct {
 	Cache   *Cache
 }
 
+var (
+	errInvalidCommand = errors.New("invalid command")
+	errInvalidService = errors.New("invalid service")
+)
+
 // NewRouter creates a new Router instance given the known
 // services that were specified in the Cache.
 func NewRouter(c *Cache) *Router {
@@ -27,7 +32,7 @@ func NewRouter(c *Cache) *Router {
 func (ss *Router) Send(c Command) error {
 	stream, ok := ss.service[c.Name]
 	if !ok {
-		return errors.New("invalid command")
+		return errInvalidCommand
 	}
 	go func() { stream <- c }()
 
@@ -41,5 +46,5 @@ func (ss *Router) Get(name string) (chan Command, error) {
 		return stream, nil
 	}
 
-	return nil, errors.New("invalid service")
+	return nil, errInvalidService
 }
