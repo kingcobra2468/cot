@@ -2,7 +2,9 @@ package gvoice
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,19 +22,45 @@ type Text struct {
 	Timestamp uint32
 }
 
-var client GVoiceClient
+var (
+	gvmsPool *sync.Pool
+)
 
-func Init(host string, port int) error {
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return err
+var (
+	errGVMSConnectionError = errors.New("unable to connect to gvms")
+)
+
+func Init(host string, port int) {
+	gvmsPool = &sync.Pool{
+		New: func() interface{} {
+			conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				return nil
+			}
+
+			return NewGVoiceClient(conn)
+		},
 	}
-
-	client = NewGVoiceClient(conn)
-	return nil
 }
 
-func (l Link) Texts() []string {
-	client.GetContactHistory(context.Background(), &FetchContactHistoryRequest{})
-	return []string{"test"}
+func (l Link) Texts(numMessages uint64) (*[]Text, error) {
+	texts := []Text{}
+	// fetch client from pool
+	client, ok := gvmsPool.Get().(GVoiceClient)
+	if !ok {
+		return &texts, errGVMSConnectionError
+	}
+
+	msgList, err := client.GetContactHistory(context.Background(),
+		&FetchContactHistoryRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, NumMessages: &numMessages})
+	gvmsPool.Put(client)
+	if err != nil || !*msgList.Success {
+		return &texts, err
+	}
+
+	for _, text := range msgList.Messages {
+		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint32(*text.Timestamp)})
+	}
+
+	return &texts, nil
 }

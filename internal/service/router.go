@@ -29,8 +29,8 @@ func NewRouter(c *Cache) *Router {
 
 // Send pushes a given Command to the correct input channel
 // if such a service exists.
-func (ss *Router) Send(c Command) error {
-	stream, ok := ss.service[c.Name]
+func (r *Router) Send(c Command) error {
+	stream, ok := r.service[c.Name]
 	if !ok {
 		return errInvalidCommand
 	}
@@ -41,8 +41,8 @@ func (ss *Router) Send(c Command) error {
 
 // Get fetches the underlying channel for a given service if
 // such a service exists.
-func (ss *Router) Get(name string) (chan Command, error) {
-	if stream, ok := ss.service[name]; ok {
+func (r *Router) Get(name string) (chan Command, error) {
+	if stream, ok := r.service[name]; ok {
 		return stream, nil
 	}
 
