@@ -19,7 +19,7 @@ type Link struct {
 
 type Text struct {
 	Message   string
-	Timestamp uint32
+	Timestamp uint64
 }
 
 var (
@@ -33,7 +33,8 @@ var (
 func Init(host string, port int) {
 	gvmsPool = &sync.Pool{
 		New: func() interface{} {
-			conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port),
+				grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				return nil
 			}
@@ -52,14 +53,15 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 	}
 
 	msgList, err := client.GetContactHistory(context.Background(),
-		&FetchContactHistoryRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, NumMessages: &numMessages})
+		&FetchContactHistoryRequest{GvoicePhoneNumber: &l.GVoiceNumber,
+			RecipientPhoneNumber: &l.ClientNumber, NumMessages: &numMessages})
 	gvmsPool.Put(client)
 	if err != nil || !*msgList.Success {
 		return &texts, err
 	}
 
 	for _, text := range msgList.Messages {
-		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint32(*text.Timestamp)})
+		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint64(*text.Timestamp)})
 	}
 
 	return &texts, nil
