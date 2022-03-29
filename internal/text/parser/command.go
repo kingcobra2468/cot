@@ -25,5 +25,5 @@ func (cp CommandParser) Parse(text string) (*service.Command, error) {
 		return nil, errUnparsableCommand
 	}
 
-	return &service.Command{Name: tokens[0], Arguments: tokens[1:]}, nil
+	return &service.Command{Name: strings.ToLower(tokens[0]), Arguments: tokens[1:]}, nil
 }

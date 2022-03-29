@@ -1,7 +1,6 @@
 package text
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -24,7 +23,7 @@ const minNumMessages uint64 = 5
 // NewListener initializes a new instance of a command listener.
 func NewListener(link gvoice.Link, encryption bool) (*Listener, error) {
 	currentTime := uint64(time.Now().Unix()) * 1000
-	fmt.Println(currentTime)
+
 	return &Listener{link: link, parser: parser.CommandParser{Encryption: encryption, Authorization: true},
 		latestTextTime: currentTime}, nil
 }
@@ -52,10 +51,14 @@ func (l *Listener) Fetch() *[]service.Command {
 // newTexts fetches all of the new text messages since the last sync.
 func (l *Listener) newTexts() (*[]gvoice.Text, error) {
 	var texts *[]gvoice.Text
+	var err error
 	// Discovers the set of new texts with the possibility of containing already
 	// visited texts. This is done to reduce calls to gvoice and overall api calls.
 	for prevSize, multiplier := 0, 1; ; {
-		texts, _ = l.link.Texts((uint64(prevSize) * uint64(math.Pow(2, float64(multiplier)))) + minNumMessages)
+		texts, err = l.link.Texts((uint64(prevSize) * uint64(math.Pow(2, float64(multiplier)))) + minNumMessages)
+		if err != nil {
+			return nil, err
+		}
 		// check if all possible texts have been retrieved
 		currentSize := len(*texts)
 		if prevSize == currentSize {

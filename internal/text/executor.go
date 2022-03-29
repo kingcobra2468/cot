@@ -29,14 +29,16 @@ func (e Executor) Start(done <-chan struct{}) {
 
 // runCommand fetches new commands for a given listener and then propagates
 // the commands to the appropriate service input stream.
-func (e Executor) runCommand(tr textRecipient) {
+func (e Executor) runCommand(tr *Listener) {
 	for _, command := range *tr.Fetch() {
+		// TODO: add logic here to check if user is authorized to use specified service
 		stream, err := e.router.Get(command.Name)
 		if err != nil {
 			fmt.Println("found invalid command")
 			continue
 		}
-
+		// TODO: remove command debug printout
+		fmt.Println(command)
 		go func(c service.Command) {
 			stream <- c
 		}(command)
