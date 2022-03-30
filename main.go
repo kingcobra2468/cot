@@ -10,37 +10,55 @@ import (
 	"github.com/spf13/viper"
 )
 
+// init initialized the parsing of the config file and associated
+// environment variables.
 func init() {
 	viper.SetConfigName("cot_sm")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
 	viper.SetEnvPrefix("COT")
-	viper.BindEnv("text_encryption")
+	viper.BindEnv("text_encryption", "gvms_hostname", "gvms_port")
 	viper.AutomaticEnv()
 }
 
-func parseConfig() (*config.Services, error) {
-	err := viper.ReadInConfig()
-	if err != nil {
-		return nil, err
-	}
+// parseServices retrieves all of the services that have been registered
+// in the config file.
+func parseServices() (*config.Services, error) {
+	var c config.Services
+	err := viper.Unmarshal(&c)
 
-	var services config.Services
-	err = viper.Unmarshal(&services)
+	return &c, err
+}
 
-	return &services, err
+// parseGVMSC retrieves GVMS connection configuration.
+func parseGVMS() (*config.GVMSConfig, error) {
+	var c config.GVMSConfig
+	err := viper.Sub("gvms").Unmarshal(&c)
+
+	return &c, err
 }
 
 func main() {
-	services, err := parseConfig()
+	// read config
+	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)
 	}
+	// read in service config and check integrity
+	services, err := parseServices()
+	if err != nil {
+		panic(err)
+	}
+	// read in gvms config and check integrity
+	gvms, err := parseGVMS()
+	if err != nil {
+		panic(err)
+	}
+	// register gvms connection config with gvms client
+	gvoice.Setup(gvms.Hostname, gvms.Port)
 
-	// TODO: fetch env vars when setting config below
-	gvoice.Init("0.0.0.0", 50051)
-
+	// create cache and register all services with it
 	serviceCache := service.NewCache()
 	serviceCache.Add(services.Names()...)
 
@@ -54,5 +72,4 @@ func main() {
 	wg.Add(1)
 	commandExecutor.Start(done)
 	wg.Wait()
-
 }

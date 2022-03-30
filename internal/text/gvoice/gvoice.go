@@ -17,6 +17,8 @@ type Link struct {
 	ClientNumber string
 }
 
+// Text contains the message and the unix-time timestamp on when
+// it was received.
 type Text struct {
 	Message   string
 	Timestamp uint64
@@ -30,7 +32,8 @@ var (
 	errGVMSConnectionError = errors.New("unable to connect to gvms")
 )
 
-func Init(host string, port int) {
+// Setup creates a new GVMS client connection pool.
+func Setup(host string, port int) {
 	gvmsPool = &sync.Pool{
 		New: func() interface{} {
 			conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port),
@@ -44,6 +47,8 @@ func Init(host string, port int) {
 	}
 }
 
+// Texts fetches the number of messages specified from the message history between
+// a client number and an associated gvoice number.
 func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 	texts := []Text{}
 	// fetch client from pool
@@ -60,6 +65,7 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 		return &texts, err
 	}
 
+	// parses each of the messages into a Text instance
 	for _, text := range msgList.Messages {
 		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint64(*text.Timestamp)})
 	}

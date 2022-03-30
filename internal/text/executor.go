@@ -31,7 +31,11 @@ func (e Executor) Start(done <-chan struct{}) {
 // the commands to the appropriate service input stream.
 func (e Executor) runCommand(tr *Listener) {
 	for _, command := range *tr.Fetch() {
-		// TODO: add logic here to check if user is authorized to use specified service
+		if !service.ClientAuthorized(command.Name, tr.link.ClientNumber) {
+			fmt.Println("unauthorized request found")
+			continue
+		}
+
 		stream, err := e.router.Get(command.Name)
 		if err != nil {
 			fmt.Println("found invalid command")

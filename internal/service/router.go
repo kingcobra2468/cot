@@ -5,7 +5,7 @@ import (
 )
 
 // Router handles the mapping between a given service and its
-// input channel.
+// command input channel.
 type Router struct {
 	service map[string]chan Command
 	Cache   *Cache
