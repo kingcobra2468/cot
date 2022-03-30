@@ -3,37 +3,31 @@ package text
 import (
 	"sync"
 	"time"
-
-	"github.com/kingcobra2468/cot/internal/service"
 )
 
 // Sync handles the synchronization of new texts for each of the
 // listeners and pushes messages to a given callback.
 type Sync struct {
-	queue      chan textRecipient
+	queue      chan *Listener
 	maxWorkers int
-}
-
-// textRecipient is the signature of new data being pushed to the
-// callback.
-type textRecipient interface {
-	Fetch() *[]service.Command
 }
 
 // workerCallback is the signature of the callback function which will
 // be called when new messages appear.
-type workerCallback func(tr textRecipient)
+type workerCallback func(tr *Listener)
 
 // NewSync creates a new instance of Sync.
 func NewSync(maxReceivers, maxWorkers int) *Sync {
-	queue := make(chan textRecipient, maxReceivers)
+	queue := make(chan *Listener, maxReceivers)
 
 	return &Sync{queue: queue, maxWorkers: maxWorkers}
 }
 
 // AddRecipient adds a new listener to the group of command listeners.
-func (ts *Sync) AddRecipient(tr textRecipient) {
-	ts.queue <- tr
+func (ts *Sync) AddRecipient(recipient ...*Listener) {
+	for _, r := range recipient {
+		ts.queue <- r
+	}
 }
 
 // Start begins the eventloop of listening for new commands given the set
