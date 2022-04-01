@@ -22,19 +22,19 @@ type GVMSConfig struct {
 }
 
 // Service contains configuration on the service name (also used as the command name)
-// as well as the service domain. Also contains a list of client numbers authorized
+// as well as the service base URI. Also contains a list of client numbers authorized
 // to use this service.
 type Service struct {
 	Name          string   `mapstructure:"name"`
-	Domain        string   `mapstructure:"domain"`
+	BaseURI       string   `mapstructure:"base_uri"`
 	ClientNumbers []string `mapstructure:"client_numbers"`
 }
 
 // Names returns a list of all of the service names.
-func (s Services) Names() []service.Service {
+func (s Services) GenerateServices() []service.Service {
 	services := []service.Service{}
 	for _, s := range s.Services {
-		services = append(services, service.Service{Name: s.Name, Domain: s.Domain})
+		services = append(services, service.Service{Name: s.Name, BaseURI: s.BaseURI})
 	}
 
 	return services

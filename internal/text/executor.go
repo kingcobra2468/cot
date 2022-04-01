@@ -11,13 +11,13 @@ import (
 // were it will be executed.
 type Executor struct {
 	*Sync
-	router *service.Router
+	cache *service.Cache
 }
 
 // NewExecutor creates a new NewExecutor instance.
-func NewExecutor(maxReceivers, maxWorkers int, r *service.Router) *Executor {
+func NewExecutor(maxReceivers, maxWorkers int, c *service.Cache) *Executor {
 	sync := NewSync(maxReceivers, maxWorkers)
-	return &Executor{Sync: sync, router: r}
+	return &Executor{Sync: sync, cache: c}
 }
 
 // Start begins the event loop which syncs messages and executes them against
@@ -36,15 +36,22 @@ func (e Executor) runCommand(tr *Listener) {
 			continue
 		}
 
-		stream, err := e.router.Get(command.Name)
+		client, err := e.cache.Get(command.Name)
 		if err != nil {
-			fmt.Println("found invalid command")
+			fmt.Println("invalid command found")
 			continue
 		}
-		// TODO: remove command debug printout
+
+		client1, ok := client.Get().(service.Service)
+		if !ok {
+			continue
+		}
 		fmt.Println(command)
-		go func(c service.Command) {
-			stream <- c
-		}(command)
+		message, err := client1.Execute(&command)
+		if err != nil {
+			tr.SendText(err.Error())
+		} else {
+			tr.SendText(message)
+		}
 	}
 }

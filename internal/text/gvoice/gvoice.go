@@ -67,8 +67,30 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 
 	// parses each of the messages into a Text instance
 	for _, text := range msgList.Messages {
+		if *text.Source == false {
+			continue
+		}
 		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint64(*text.Timestamp)})
 	}
 
 	return &texts, nil
+}
+
+func (l Link) SendText(message string) error {
+	client, ok := gvmsPool.Get().(GVoiceClient)
+	if !ok {
+		return errGVMSConnectionError
+	}
+	resp, err := client.SendSMS(context.Background(),
+		&SendSMSRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, Message: &message})
+	gvmsPool.Put(client)
+
+	if err != nil {
+		return err
+	}
+	if resp.Error != nil {
+		return errors.New(*resp.Error)
+	}
+
+	return nil
 }

@@ -48,6 +48,10 @@ func (l *Listener) Fetch() *[]service.Command {
 	return &commands
 }
 
+func (l *Listener) SendText(message string) error {
+	return l.link.SendText(message)
+}
+
 // newTexts fetches all of the new text messages since the last sync.
 func (l *Listener) newTexts() (*[]gvoice.Text, error) {
 	var texts *[]gvoice.Text
