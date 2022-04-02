@@ -46,7 +46,7 @@ func main() {
 		panic(err)
 	}
 	// read in service config and check integrity
-	services, err := parseServices()
+	servicesConf, err := parseServices()
 	if err != nil {
 		panic(err)
 	}
@@ -58,15 +58,16 @@ func main() {
 	// register gvms connection config with gvms client
 	gvoice.Setup(gvms.Hostname, gvms.Port)
 
-	// create cache and register all services with it
-	serviceCache := service.NewCache()
-	serviceCache.Add(services.Names()...)
-
-	serviceRouter := service.NewRouter(serviceCache)
-	listeners := services.Listeners()
-	commandExecutor := text.NewExecutor(5, len(*listeners), serviceRouter)
-	commandExecutor.AddRecipient((*listeners)...)
 	done := make(chan struct{})
+
+	// create cache and register all services with it
+	services := servicesConf.GenerateServices()
+	serviceCache := service.NewCache()
+	serviceCache.Add(services...)
+
+	listeners := servicesConf.Listeners()
+	commandExecutor := text.NewExecutor(5, len(*listeners), serviceCache)
+	commandExecutor.AddRecipient((*listeners)...)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

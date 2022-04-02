@@ -1,3 +1,5 @@
+// parser handles the parsing of a text into viable command components.
+// Also manages encryption if enabled.
 package parser
 
 import (

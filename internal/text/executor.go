@@ -1,7 +1,10 @@
+// text handles the stream of commands from client numbers and the overall
+// runtime.
 package text
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kingcobra2468/cot/internal/service"
 )
@@ -11,13 +14,13 @@ import (
 // were it will be executed.
 type Executor struct {
 	*Sync
-	router *service.Router
+	cache *service.Cache
 }
 
 // NewExecutor creates a new NewExecutor instance.
-func NewExecutor(maxReceivers, maxWorkers int, r *service.Router) *Executor {
+func NewExecutor(maxReceivers, maxWorkers int, c *service.Cache) *Executor {
 	sync := NewSync(maxReceivers, maxWorkers)
-	return &Executor{Sync: sync, router: r}
+	return &Executor{Sync: sync, cache: c}
 }
 
 // Start begins the event loop which syncs messages and executes them against
@@ -36,15 +39,27 @@ func (e Executor) runCommand(tr *Listener) {
 			continue
 		}
 
-		stream, err := e.router.Get(command.Name)
+		clientPool, err := e.cache.Get(command.Name)
 		if err != nil {
-			fmt.Println("found invalid command")
+			fmt.Println("invalid command found")
 			continue
 		}
-		// TODO: remove command debug printout
+
+		client, ok := clientPool.Get().(service.Service)
+		if !ok {
+			continue
+		}
 		fmt.Println(command)
-		go func(c service.Command) {
-			stream <- c
-		}(command)
+		message, err := client.Execute(&command)
+		if err != nil {
+			msg := err.Error()
+			msg = strings.ReplaceAll(msg, "\"", "\\\"")
+			msg = strings.ReplaceAll(msg, "\n", "")
+			tr.SendText(msg)
+		} else {
+			tr.SendText(message)
+		}
+
+		clientPool.Put(client)
 	}
 }
