@@ -1,3 +1,5 @@
+// service manages a single client service, the client to such service,
+// as well as the whitelist on which client numbers can access it.
 package service
 
 import (

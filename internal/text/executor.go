@@ -1,3 +1,5 @@
+// text handles the stream of commands from client numbers and the overall
+// runtime.
 package text
 
 import (

@@ -1,3 +1,4 @@
+// gvoice manages the communication with GVMS.
 package gvoice
 
 import (

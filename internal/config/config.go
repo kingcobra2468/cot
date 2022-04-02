@@ -1,3 +1,5 @@
+// config handles the parsing of cot config into useful
+// structures. Also handles the setup of components.
 package config
 
 import (
@@ -8,7 +10,7 @@ import (
 
 // Services contains configuration on each of the services and the client
 // numbers authorized to use it. Also contains the encryption and gvoice number
-//  bindings that the client numbers send messages to.
+// bindings that the client numbers send messages to.
 type Services struct {
 	Services       []Service `mapstructure:"services"`
 	GVoiceNumber   string    `mapstructure:"gvoice_number"`
