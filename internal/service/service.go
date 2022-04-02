@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 // Service pushes a given command to its intended service.
@@ -20,10 +21,14 @@ type Command struct {
 	Arguments []string
 }
 
+// CommandRequest setsup up the request payload for sending command arguments to
+// the service client.
 type CommandRequest struct {
 	Args []string `json:"args"`
 }
 
+// CommandRequest setsup up the response payload for sending command arguments to
+// the service client
 type CommandResponse struct {
 	Message string `json:"message"`
 	Error   error  `json:"error,omitempty"`
@@ -47,7 +52,7 @@ func (s Service) Listen(stream <-chan *Command, done <-chan struct{}) {
 
 // execute will run the command against the service.
 func (s Service) Execute(c *Command) (string, error) {
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Second * 10}
 	data, err := json.Marshal(CommandRequest{Args: c.Arguments})
 	if err != nil {
 		return "", err

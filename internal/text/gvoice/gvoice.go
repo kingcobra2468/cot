@@ -76,11 +76,13 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 	return &texts, nil
 }
 
+// SendText sends a text message to the recipient in the link.
 func (l Link) SendText(message string) error {
 	client, ok := gvmsPool.Get().(GVoiceClient)
 	if !ok {
 		return errGVMSConnectionError
 	}
+	fmt.Println(&SendSMSRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, Message: &message})
 	resp, err := client.SendSMS(context.Background(),
 		&SendSMSRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, Message: &message})
 	gvmsPool.Put(client)

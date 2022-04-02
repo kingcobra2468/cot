@@ -2,6 +2,7 @@ package text
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kingcobra2468/cot/internal/service"
 )
@@ -36,22 +37,27 @@ func (e Executor) runCommand(tr *Listener) {
 			continue
 		}
 
-		client, err := e.cache.Get(command.Name)
+		clientPool, err := e.cache.Get(command.Name)
 		if err != nil {
 			fmt.Println("invalid command found")
 			continue
 		}
 
-		client1, ok := client.Get().(service.Service)
+		client, ok := clientPool.Get().(service.Service)
 		if !ok {
 			continue
 		}
 		fmt.Println(command)
-		message, err := client1.Execute(&command)
+		message, err := client.Execute(&command)
 		if err != nil {
-			tr.SendText(err.Error())
+			msg := err.Error()
+			msg = strings.ReplaceAll(msg, "\"", "\\\"")
+			msg = strings.ReplaceAll(msg, "\n", "")
+			tr.SendText(msg)
 		} else {
 			tr.SendText(message)
 		}
+
+		clientPool.Put(client)
 	}
 }
