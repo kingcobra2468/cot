@@ -1,0 +1,9 @@
+gvoice_number: 0
+services:
+  - name: name
+    base_uri: "http://localhost"
+    client_numbers:
+    - 0
+gvms:
+  hostname: "localhost"
+  port: 0
