@@ -1,33 +1,39 @@
 # **COT**
-Commands over text(COT) is generic runtime for creating commands from user-built
-services.
+Commands over text(COT) is bridge for sending user-defined commands over the SMS
+protocol. This offers and alternative method for sending commands without the need
+to do any port forwarding.
+
+COT's generic architecture allows it to avoid any coupling with the would be
+commands as each command is executed via an external client service. Thus, COT
+only needs to know the bindings and will propagate the command request to the
+actual client service which will contain the appropriate logic for dealing with
+the request. 
 
 ## **Terminology**
-- **Client Number=** phone number that sends the command requests.
+- **Client Number=** phone number that sends the command request.
 - **GVoice Number=** Gvoice phone number that services as receiver for commands that
-  came from client numbers.
+  come from client numbers.
 - **GVMS=** microservice for interacting with GVoice's APIs.
-- **Client Service=** user-defined service that handles the command and returns
-  the response to COT.
+- **Client Service=** user-defined service that is implemented externally of COT and is
+  responsible for taking in a command request, executing it, and returning the response.
 
 ## **Architecture**
 ![photo](images/cot.jpg)
 
-COT, being only a generic service, enables one to create any command they want
-as long as one defines it within `cot_sm.yaml`. Within the config file,
-one would specify:
+COT, being generic, enables one to create any command they want as long as one defines
+it within `cot_sm.yaml`. Within the config file, one would specify:
 1. Name of the command.
-2. User service that will execute the command.
-3. List of client numbers authorized to run the command.
+2. Client service that will execute the command.
+3. List of client numbers authorized to use the command.
 
 ### **Flow**
 The end-to-end flow starting from the client number is as follows:
 1. Client sends command in "[cmd] [arg 1] [arg 2] ... [arg N]" format to the configured
    GVoice number.
 3. COT would have initialized a worker that checks the (GVoice Number, Client Number)
-   link periodically via GVMS. By listening to only the subnet of defined Client Numbers,
-   COT will by nature ignore all numbers that have not been whitelisted within `cot_sm.yaml`
-   by any of the services.
+   link periodically via GVMS. By listening to only the subnet of defined client numbers,
+   COT, by nature, will ignore all numbers that have not been whitelisted by any of the
+   services within `cot_sm.yaml`.
 4. COT parsers the command and checks if the client number is authorized to run this command.
    Non-authorized commands will be rejected.
 5. The arguments of the command will be sent as an array of args to the client service's endpoint
@@ -56,7 +62,7 @@ Likewise, another number `1415111113` will fail regardless of the `lights` or `e
 they are not authorized for either. All 3 numbers will be rejected for any other commands as
 no other commands exist.
 
-## **Defining User Commands & Services**
+## **Defining Commands & Associated Client Services**
 All commands are defined as list items under the `services:` section. Each command must follow
 this schematic
 ```yaml
