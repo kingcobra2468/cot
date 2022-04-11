@@ -1,3 +1,5 @@
+// crypto handles the PGP encryption/decryption as well as the
+// Base64 encoding/decoding that can take place.
 package crypto
 
 import (
@@ -14,21 +16,24 @@ import (
 )
 
 var (
+	// stores the PGP public key for each client number
 	keyCache      = cache.New(cache.NoExpiration, 0)
 	cotPrivateKey = ""
+	cryptoConfig  *config.Encryption
 )
 
 var (
-	errInvalidService = errors.New("client number doesn't exist")
-	cryptoConfig      *config.Encryption
+	errInvalidClientNumber = errors.New("client number doesn't exist")
 )
 
+// Decrypt attempts to decrypt a PGP message sent by a client number.
 func Decrypt(clientNumber, message string) (string, error) {
-	key, found := keyCache.Get(clientNumber)
+	publicKey, found := keyCache.Get(clientNumber)
 	if !found {
-		return "", errInvalidService
+		return "", errInvalidClientNumber
 	}
 
+	// perform base64 decoding if enabled
 	if cryptoConfig.Base64Encoding {
 		cipherText, err := b64.StdEncoding.DecodeString(message)
 		if err != nil {
@@ -36,28 +41,29 @@ func Decrypt(clientNumber, message string) (string, error) {
 		}
 		message = string(cipherText)
 	}
-
 	var err error
 	if cryptoConfig.SignatureVerification {
-		message, err = helper.DecryptVerifyMessageArmored(string(key.(string)), cotPrivateKey, []byte(cryptoConfig.Passphrase), string(message))
+		message, err = helper.DecryptVerifyMessageArmored(string(publicKey.(string)), cotPrivateKey, []byte(cryptoConfig.Passphrase), message)
 	} else {
-		message, err = helper.DecryptMessageArmored(cotPrivateKey, []byte(cryptoConfig.Passphrase), string(message))
+		message, err = helper.DecryptMessageArmored(cotPrivateKey, []byte(cryptoConfig.Passphrase), message)
 	}
 
 	return message, err
 }
 
+// Encrypt attempts to encrypt a plaintext message into a PGP ASCII-armored message for a
+// given client number.
 func Encrypt(clientNumber, message string) (string, error) {
-	key, found := keyCache.Get(clientNumber)
+	publicKey, found := keyCache.Get(clientNumber)
 	if !found {
-		return "", errInvalidService
+		return "", errInvalidClientNumber
 	}
 
 	var err error
 	if cryptoConfig.SignatureVerification {
-		message, err = helper.EncryptSignMessageArmored(string(key.(string)), cotPrivateKey, []byte(cryptoConfig.Passphrase), message)
+		message, err = helper.EncryptSignMessageArmored(string(publicKey.(string)), cotPrivateKey, []byte(cryptoConfig.Passphrase), message)
 	} else {
-		message, err = helper.EncryptMessageArmored(string(key.(string)), message)
+		message, err = helper.EncryptMessageArmored(string(publicKey.(string)), message)
 	}
 	if err != nil {
 		return "", err
@@ -68,6 +74,8 @@ func Encrypt(clientNumber, message string) (string, error) {
 	return message, nil
 }
 
+// LoadClientNumberKeys attempts to register every public key (ending with .asc extension) to a client number.
+// The name of the file should match 1:1 with what is specified in the configuration file.
 func LoadClientNumberKeys(path string) error {
 	keyPaths, err := filepath.Glob(filepath.Join(path, "*.asc"))
 	if err != nil {
@@ -81,6 +89,7 @@ func LoadClientNumberKeys(path string) error {
 			continue
 		}
 
+		// extract the client number from the filename
 		fileName := filepath.Base(path)
 		clientNumber := strings.TrimSuffix(fileName, filepath.Ext(fileName))
 
@@ -90,6 +99,7 @@ func LoadClientNumberKeys(path string) error {
 	return nil
 }
 
+// SetConfig sets up the crypto module by providing the encryption configuration.
 func SetConfig(c *config.Encryption) error {
 	cryptoConfig = c
 

@@ -5,6 +5,8 @@ import (
 )
 
 var (
+	// registers a client number as well as the "{serviceName}-{clientNumber}"
+	// hash for constant-time lookup
 	whitelist = cache.New(cache.NoExpiration, 0)
 )
 

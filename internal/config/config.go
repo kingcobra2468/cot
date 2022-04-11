@@ -3,8 +3,9 @@
 package config
 
 // Services contains configuration on each of the services and the client
-// numbers authorized to use it. Also contains the encryption and gvoice number
-// bindings that the client numbers send messages to.
+// numbers authorized to use it. Also contains the GVoice number
+// bindings that the client numbers send messages to. The ability to
+// see whether text encryption is enabled is also accessible.
 type Services struct {
 	Services       []Service `mapstructure:"services"`
 	GVoiceNumber   string    `mapstructure:"gvoice_number"`
@@ -20,6 +21,8 @@ type Service struct {
 	ClientNumbers []string `mapstructure:"client_numbers"`
 }
 
+// Encryption contains configuration on various options for encryption and files
+// needed if PGP encryption is enabled.
 type Encryption struct {
 	TextEncryption           bool   `mapstructure:"text_encryption"`
 	SignatureVerification    bool   `mapstructure:"sig_verification"`
@@ -30,7 +33,7 @@ type Encryption struct {
 	ClientNumberPublicKeyDir string `mapstructure:"cn_public_key_dir"`
 }
 
-// GVMSConfig contains configuration on communicating with GVMS.
+// GVMS contains configuration on how to communicate with GVMS server.
 type GVMS struct {
 	Hostname string `mapstructure:"hostname"`
 	Port     int    `mapstructure:"port"`

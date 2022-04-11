@@ -27,6 +27,7 @@ type Text struct {
 }
 
 var (
+	// gRPC client pool for communicating with GVMS
 	gvmsPool *sync.Pool
 )
 
@@ -34,7 +35,8 @@ var (
 	errGVMSConnectionError = errors.New("unable to connect to gvms")
 )
 
-// Setup creates a new GVMS client connection pool.
+// Setup creates a new GVMS client connection pool based on the connection
+// configuration.
 func Setup(c *config.GVMS) {
 	gvmsPool = &sync.Pool{
 		New: func() interface{} {
@@ -53,12 +55,13 @@ func Setup(c *config.GVMS) {
 // a client number and an associated gvoice number.
 func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 	texts := []Text{}
-	// fetch client from pool
+	// fetch a client from pool
 	client, ok := gvmsPool.Get().(GVoiceClient)
 	if !ok {
 		return &texts, errGVMSConnectionError
 	}
 
+	// extract a list of messages which contain at most numMessages messages
 	msgList, err := client.GetContactHistory(context.Background(),
 		&FetchContactHistoryRequest{GvoicePhoneNumber: &l.GVoiceNumber,
 			RecipientPhoneNumber: &l.ClientNumber, NumMessages: &numMessages})
@@ -67,9 +70,9 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 		return &texts, err
 	}
 
-	// parses each of the messages into a Text instance
+	// creates a Text instance for each raw message
 	for _, text := range msgList.Messages {
-		if *text.Source == false {
+		if !*text.Source {
 			continue
 		}
 		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint64(*text.Timestamp)})
@@ -78,7 +81,7 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 	return &texts, nil
 }
 
-// SendText sends a text message to the recipient in the link.
+// SendText sends a text message to the setup recipient.
 func (l Link) SendText(message string) error {
 	client, ok := gvmsPool.Get().(GVoiceClient)
 	if !ok {

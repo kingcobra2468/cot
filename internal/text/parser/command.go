@@ -13,7 +13,7 @@ var (
 	errUnparsableCommand = errors.New("unable to parse command")
 )
 
-// Parse parses the input text into command name and argument components.
+// Parse parses the input text into an instance of a Command.
 func Parse(text string) (*service.Command, error) {
 	tokens := strings.Fields(text)
 

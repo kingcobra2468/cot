@@ -11,58 +11,44 @@ import (
 	"github.com/kingcobra2468/cot/internal/config"
 )
 
-// Service pushes a given command to its intended service.
+// Service handles the communication between a command request and the associated
+// client service.
 type Service struct {
 	Name    string
 	BaseURI string
 }
 
-// Command sets up the schema for a given command.
+// Command sets up the schema for a command request via the name of a command and its
+// its arguments.
 type Command struct {
 	Name      string
 	Arguments []string
 }
 
-// CommandRequest setsup up the request payload for sending command arguments to
-// the service client.
+// CommandRequest contains the JSON request schema.
 type CommandRequest struct {
 	Args []string `json:"args"`
 }
 
-// CommandRequest setsup up the response payload for sending command arguments to
-// the service client
+// CommandRequest sets up the JSON response schema.
 type CommandResponse struct {
 	Message string `json:"message"`
 	Error   error  `json:"error,omitempty"`
 }
 
-// Names returns a list of all of the service names.
-func GenerateServices(s *config.Services) []Service {
+// GenerateServices creates a list of services that were specified
+// in the configuration file.
+func GenerateServices(c *config.Services) []Service {
 	services := []Service{}
-	for _, s := range s.Services {
+	for _, s := range c.Services {
 		services = append(services, Service{Name: s.Name, BaseURI: s.BaseURI})
 	}
 
 	return services
 }
 
-// Listen attends to a given channel for new commands and executes
-// them against a given service.
-func (s Service) Listen(stream <-chan *Command, done <-chan struct{}) {
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case command := <-stream:
-				message, err := s.Execute(command)
-				fmt.Println(message, err)
-			}
-		}
-	}()
-}
-
-// execute will run the command against the service.
+// Execute will push the command request to the associated client service and will
+// retrieve the output.
 func (s Service) Execute(c *Command) (string, error) {
 	client := &http.Client{Timeout: time.Second * 10}
 	data, err := json.Marshal(CommandRequest{Args: c.Arguments})
@@ -86,11 +72,14 @@ func (s Service) Execute(c *Command) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	var output CommandResponse
 	err = json.Unmarshal(bodyBytes, &output)
+	// check if output parsable
 	if err != nil {
 		return "", err
 	}
+	// check if error was sent back from client service
 	if output.Error != nil {
 		return "", err
 	}

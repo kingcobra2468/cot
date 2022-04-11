@@ -32,9 +32,11 @@ func (e Executor) Start(done <-chan struct{}) {
 
 // runCommand fetches new commands for a given listener and then propagates
 // the commands to the appropriate service input stream.
-func (e Executor) runCommand(tr *Listener) {
-	for _, command := range *tr.Fetch() {
-		if !service.ClientAuthorized(command.Name, tr.link.ClientNumber) {
+func (e Executor) runCommand(l *Listener) {
+	for _, command := range *l.Fetch() {
+		// check if the command request is authorized given the client number
+		// that initiated it
+		if !service.ClientAuthorized(command.Name, l.link.ClientNumber) {
 			fmt.Println("unauthorized request found")
 			continue
 		}
@@ -49,15 +51,18 @@ func (e Executor) runCommand(tr *Listener) {
 		if !ok {
 			continue
 		}
+		// TODO: make into log
 		fmt.Println(command)
+
 		message, err := client.Execute(&command)
 		if err != nil {
 			msg := err.Error()
+			// fix encoding issues when sending errors
 			msg = strings.ReplaceAll(msg, "\"", "\\\"")
 			msg = strings.ReplaceAll(msg, "\n", "")
-			tr.SendText(msg)
+			l.SendText(msg)
 		} else {
-			tr.SendText(message)
+			l.SendText(message)
 		}
 
 		clientPool.Put(client)
