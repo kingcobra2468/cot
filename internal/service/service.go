@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/kingcobra2468/cot/internal/config"
 )
 
 // Service pushes a given command to its intended service.
@@ -32,6 +34,16 @@ type CommandRequest struct {
 type CommandResponse struct {
 	Message string `json:"message"`
 	Error   error  `json:"error,omitempty"`
+}
+
+// Names returns a list of all of the service names.
+func GenerateServices(s *config.Services) []Service {
+	services := []Service{}
+	for _, s := range s.Services {
+		services = append(services, Service{Name: s.Name, BaseURI: s.BaseURI})
+	}
+
+	return services
 }
 
 // Listen attends to a given channel for new commands and executes

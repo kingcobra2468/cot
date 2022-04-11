@@ -23,8 +23,8 @@ func NewCache() *Cache {
 }
 
 // Add service(s) to the cache. Creates a new client pool for each service.
-func (c *Cache) Add(services ...Service) {
-	for _, s := range services {
+func (c *Cache) Add(s ...Service) {
+	for _, s := range s {
 		c.mtx.Lock()
 		c.cache[s.Name] = newServicePool(s)
 		c.mtx.Unlock()

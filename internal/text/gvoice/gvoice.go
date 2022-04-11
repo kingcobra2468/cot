@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/kingcobra2468/cot/internal/config"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -34,10 +35,10 @@ var (
 )
 
 // Setup creates a new GVMS client connection pool.
-func Setup(host string, port int) {
+func Setup(c *config.GVMS) {
 	gvmsPool = &sync.Pool{
 		New: func() interface{} {
-			conn, err := grpc.Dial(fmt.Sprintf("%s:%d", host, port),
+			conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.Hostname, c.Port),
 				grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				return nil
@@ -83,9 +84,9 @@ func (l Link) SendText(message string) error {
 	if !ok {
 		return errGVMSConnectionError
 	}
-	fmt.Println(&SendSMSRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, Message: &message})
-	resp, err := client.SendSMS(context.Background(),
-		&SendSMSRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, Message: &message})
+
+	msg := &SendSMSRequest{GvoicePhoneNumber: &l.GVoiceNumber, RecipientPhoneNumber: &l.ClientNumber, Message: &message}
+	resp, err := client.SendSMS(context.Background(), msg)
 	gvmsPool.Put(client)
 
 	if err != nil {

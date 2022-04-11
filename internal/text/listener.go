@@ -1,10 +1,13 @@
 package text
 
 import (
+	"fmt"
 	"math"
 	"time"
 
+	"github.com/kingcobra2468/cot/internal/config"
 	"github.com/kingcobra2468/cot/internal/service"
+	"github.com/kingcobra2468/cot/internal/text/crypto"
 	"github.com/kingcobra2468/cot/internal/text/gvoice"
 	"github.com/kingcobra2468/cot/internal/text/parser"
 )
@@ -13,18 +16,40 @@ import (
 type Listener struct {
 	link           gvoice.Link
 	latestTextTime uint64
-	parser         parser.CommandParser
+	encryption     bool
 }
 
 // minNumMessages is the minimum number of messages to fetch on the first iteration
 // when fetching the first conversation chunk.
 const minNumMessages uint64 = 5
 
+// Listeners creates a listener for each of the numbers once. Also creates the whitelist
+// list for each client number & service pair.
+func GenerateListeners(s *config.Services) *[]*Listener {
+	listeners := []*Listener{}
+	for _, cs := range s.Services {
+		for _, cn := range cs.ClientNumbers {
+			// check if listener for client number already exists
+			if service.ClientExists(cn) {
+				service.AddClient(cs.Name, cn)
+				continue
+			}
+			// creates a new client number listener
+			if l, err := NewListener(gvoice.Link{GVoiceNumber: s.GVoiceNumber, ClientNumber: cn}, s.TextEncryption); err == nil {
+				listeners = append(listeners, l)
+				service.AddClient(cs.Name, cn)
+			}
+		}
+	}
+
+	return &listeners
+}
+
 // NewListener initializes a new instance of a command listener.
 func NewListener(link gvoice.Link, encryption bool) (*Listener, error) {
 	currentTime := uint64(time.Now().Unix()) * 1000
 
-	return &Listener{link: link, parser: parser.CommandParser{Encryption: encryption, Authorization: true},
+	return &Listener{link: link, encryption: encryption,
 		latestTextTime: currentTime}, nil
 }
 
@@ -38,7 +63,16 @@ func (l *Listener) Fetch() *[]service.Command {
 
 	// parses each of the valid texts into a command
 	for _, text := range *texts {
-		if command, err := l.parser.Parse(text.Message); err == nil {
+		msg := text.Message
+		if l.encryption {
+			msg, err = crypto.Decrypt(l.link.ClientNumber, msg)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+		}
+
+		if command, err := parser.Parse(msg); err == nil {
 			commands = append(commands, *command)
 		}
 	}
@@ -49,7 +83,17 @@ func (l *Listener) Fetch() *[]service.Command {
 }
 
 func (l *Listener) SendText(message string) error {
-	return l.link.SendText(message)
+	msg := message
+	if l.encryption {
+		var err error
+		msg, err = crypto.Encrypt(l.link.ClientNumber, msg)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	fmt.Println(msg)
+	return l.link.SendText(msg)
 }
 
 // newTexts fetches all of the new text messages since the last sync.

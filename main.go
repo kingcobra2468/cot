@@ -6,6 +6,7 @@ import (
 	"github.com/kingcobra2468/cot/internal/config"
 	"github.com/kingcobra2468/cot/internal/service"
 	"github.com/kingcobra2468/cot/internal/text"
+	"github.com/kingcobra2468/cot/internal/text/crypto"
 	"github.com/kingcobra2468/cot/internal/text/gvoice"
 	"github.com/spf13/viper"
 )
@@ -17,9 +18,16 @@ func init() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
-	viper.SetEnvPrefix("COT")
-	viper.BindEnv("text_encryption", "gvms_hostname", "gvms_port")
+	viper.SetEnvPrefix("cot")
 	viper.AutomaticEnv()
+
+	viper.BindEnv("text_encryption")
+	viper.BindEnv("public_key_file")
+	viper.BindEnv("private_key_file")
+	viper.BindEnv("passphrase")
+	viper.BindEnv("cn_public_key_dir")
+	viper.BindEnv("sig_verification")
+	viper.BindEnv("base64_encoding")
 }
 
 // parseServices retrieves all of the services that have been registered
@@ -31,10 +39,18 @@ func parseServices() (*config.Services, error) {
 	return &c, err
 }
 
-// parseGVMSC retrieves GVMS connection configuration.
-func parseGVMS() (*config.GVMSConfig, error) {
-	var c config.GVMSConfig
+// parseGVMS retrieves GVMS connection configuration.
+func parseGVMS() (*config.GVMS, error) {
+	var c config.GVMS
 	err := viper.Sub("gvms").Unmarshal(&c)
+
+	return &c, err
+}
+
+// parseGVMSC retrieves GVMS connection configuration.
+func parseEncryption() (*config.Encryption, error) {
+	var c config.Encryption
+	err := viper.Unmarshal(&c)
 
 	return &c, err
 }
@@ -46,7 +62,7 @@ func main() {
 		panic(err)
 	}
 	// read in service config and check integrity
-	servicesConf, err := parseServices()
+	sc, err := parseServices()
 	if err != nil {
 		panic(err)
 	}
@@ -56,16 +72,31 @@ func main() {
 		panic(err)
 	}
 	// register gvms connection config with gvms client
-	gvoice.Setup(gvms.Hostname, gvms.Port)
+	gvoice.Setup(gvms)
+
+	// read in gvms config and check integrity
+	encryption, err := parseEncryption()
+	if err != nil {
+		panic(err)
+	}
+
+	if encryption.TextEncryption {
+		err := crypto.SetConfig(encryption)
+		if err != nil {
+			panic(err)
+		}
+
+		crypto.LoadClientNumberKeys(encryption.ClientNumberPublicKeyDir)
+	}
 
 	done := make(chan struct{})
 
 	// create cache and register all services with it
-	services := servicesConf.GenerateServices()
+	services := service.GenerateServices(sc)
 	serviceCache := service.NewCache()
 	serviceCache.Add(services...)
 
-	listeners := servicesConf.Listeners()
+	listeners := text.GenerateListeners(sc)
 	commandExecutor := text.NewExecutor(5, len(*listeners), serviceCache)
 	commandExecutor.AddRecipient((*listeners)...)
 
