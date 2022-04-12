@@ -8,6 +8,7 @@ import (
 // Sync handles the synchronization of new texts for each of the
 // listeners and pushes messages to a given callback.
 type Sync struct {
+	// listener worker pool queue for polling listeners for new commands
 	queue      chan *Listener
 	maxWorkers int
 }
@@ -24,17 +25,17 @@ func NewSync(maxReceivers, maxWorkers int) *Sync {
 }
 
 // AddRecipient adds a new listener to the group of command listeners.
-func (ts *Sync) AddRecipient(recipient ...*Listener) {
+func (s *Sync) AddRecipient(recipient ...*Listener) {
 	for _, r := range recipient {
-		ts.queue <- r
+		s.queue <- r
 	}
 }
 
 // Start begins the eventloop of listening for new commands given the set
 // of provided listeners.
-func (ts *Sync) Start(wc workerCallback, done <-chan struct{}) *sync.WaitGroup {
+func (s *Sync) Start(wc workerCallback, done <-chan struct{}) *sync.WaitGroup {
 	workers := sync.WaitGroup{}
-	for i := 0; i < ts.maxWorkers; i++ {
+	for i := 0; i < s.maxWorkers; i++ {
 		workers.Add(1)
 		go func() {
 			for {
@@ -42,11 +43,11 @@ func (ts *Sync) Start(wc workerCallback, done <-chan struct{}) *sync.WaitGroup {
 				case <-done:
 					workers.Done()
 					return
-				case tr := <-ts.queue:
-					wc(tr)
+				case l := <-s.queue:
+					wc(l)
 					go func() {
 						time.Sleep(time.Duration(time.Second * 10))
-						ts.queue <- tr
+						s.queue <- l
 					}()
 				}
 			}
