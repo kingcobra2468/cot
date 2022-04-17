@@ -149,7 +149,9 @@ App Store/Play Store and do the steps themselves each time.
 
 ### **Service & Command Configuration**
 Configuration is done via the `cot_sm.yaml` file which needs to be copied/renamed from 
-`cot_sm_template.yaml`. Aside from defining services which were explained
+`cot_sm_template.yaml`. By default, the file needs to be located in the same directory as
+the executable or `main.go`, unless an alternate path is specified via the `COT_CONF_DIR`
+environment variable. Aside from defining services which were explained
 [here](#defining-user-commands), the gvoice number that all client numbers will be sending
 commands to needs to be defined via `gvoice_number`. Similarly, GVMS config needs to be defined
 which sets the binding of what hostname and port GVMS is running on.
