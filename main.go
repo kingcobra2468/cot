@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"os"
 	"sync"
 
 	"github.com/golang/glog"
@@ -18,6 +19,10 @@ import (
 func init() {
 	viper.SetConfigName("cot_sm")
 	viper.SetConfigType("yaml")
+
+	if path, exists := os.LookupEnv("COT_CONF_DIR"); exists {
+		viper.AddConfigPath(path)
+	}
 	viper.AddConfigPath(".")
 
 	viper.SetEnvPrefix("cot")
