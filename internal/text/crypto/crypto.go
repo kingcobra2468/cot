@@ -5,12 +5,12 @@ package crypto
 import (
 	b64 "encoding/base64"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/ProtonMail/gopenpgp/v2/helper"
+	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
 	"github.com/patrickmn/go-cache"
 )
@@ -84,8 +84,7 @@ func LoadClientNumberKeys(path string) error {
 	for _, path := range keyPaths {
 		publicKey, err := os.ReadFile(path)
 		if err != nil {
-			fmt.Println(err)
-			// TODO: log error
+			glog.Errorln(err)
 			continue
 		}
 

@@ -3,9 +3,9 @@
 package text
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/service"
 )
 
@@ -37,22 +37,21 @@ func (e Executor) runCommand(l *Listener) {
 		// check if the command request is authorized given the client number
 		// that initiated it
 		if !service.ClientAuthorized(command.Name, l.link.ClientNumber) {
-			fmt.Println("unauthorized request found")
+			glog.Warningf("%s attempted to run command \"%s\" while unauthorized to do so", l.link.ClientNumber, command.Name)
 			continue
 		}
 
 		clientPool, err := e.cache.Get(command.Name)
 		if err != nil {
-			fmt.Println("invalid command found")
+			glog.Warningf("invalid command \"%s\" found", command.Name)
 			continue
 		}
 
 		client, ok := clientPool.Get().(service.Service)
 		if !ok {
-			continue
+			glog.Errorf("unable to fetch client from %s's service pool", command.Name)
 		}
-		// TODO: make into log
-		fmt.Println(command)
+		glog.Infof("executed \"%s\" with args \"%v\"", command.Name, command.Arguments)
 
 		message, err := client.Execute(&command)
 		if err != nil {

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"flag"
 	"sync"
 
+	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
 	"github.com/kingcobra2468/cot/internal/service"
 	"github.com/kingcobra2468/cot/internal/text"
@@ -56,20 +58,22 @@ func parseEncryption() (*config.Encryption, error) {
 }
 
 func main() {
+	flag.Parse()
+
 	// read config
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(err)
+		glog.Fatalln(err)
 	}
 	// read in service config and check integrity
 	sc, err := parseServices()
 	if err != nil {
-		panic(err)
+		glog.Fatalln(err)
 	}
 	// read in gvms config and check integrity
 	gvms, err := parseGVMS()
 	if err != nil {
-		panic(err)
+		glog.Fatalln(err)
 	}
 	// register gvms connection config with gvms client
 	gvoice.Setup(gvms)
@@ -77,13 +81,13 @@ func main() {
 	// read in gvms config and check integrity
 	encryption, err := parseEncryption()
 	if err != nil {
-		panic(err)
+		glog.Fatalln(err)
 	}
 
 	if encryption.TextEncryption {
 		err := crypto.SetConfig(encryption)
 		if err != nil {
-			panic(err)
+			glog.Fatalln(err)
 		}
 
 		crypto.LoadClientNumberKeys(encryption.ClientNumberPublicKeyDir)

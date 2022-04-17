@@ -1,10 +1,10 @@
 package text
 
 import (
-	"fmt"
 	"math"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
 	"github.com/kingcobra2468/cot/internal/service"
 	"github.com/kingcobra2468/cot/internal/text/crypto"
@@ -38,6 +38,7 @@ func GenerateListeners(c *config.Services) *[]*Listener {
 			if l, err := NewListener(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption); err == nil {
 				listeners = append(listeners, l)
 				service.AddClient(s.Name, cn)
+				glog.Infof("created new listener for %s", cn)
 			}
 		}
 	}
@@ -68,9 +69,9 @@ func (l *Listener) Fetch() *[]service.Command {
 		msg := text.Message
 		// perform decryption of message if enabled
 		if l.encryption {
-			fmt.Println("adasd ", msg)
 			msg, err = crypto.Decrypt(l.link.ClientNumber, msg)
 			if err != nil {
+				glog.Errorln(err)
 				continue
 			}
 		}
@@ -93,11 +94,10 @@ func (l *Listener) SendText(message string) error {
 		var err error
 		msg, err = crypto.Encrypt(l.link.ClientNumber, msg)
 		if err != nil {
-			fmt.Println(err)
+			glog.Errorln(err)
 		}
 	}
 
-	fmt.Println(msg)
 	return l.link.SendText(msg)
 }
 
