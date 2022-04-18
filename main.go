@@ -43,6 +43,10 @@ func parseServices() (*config.Services, error) {
 	var c config.Services
 	err := viper.Unmarshal(&c)
 
+	for _, s := range c.Services {
+		s.SetDefaultEndpoint("/cmd")
+	}
+
 	return &c, err
 }
 
@@ -54,7 +58,7 @@ func parseGVMS() (*config.GVMS, error) {
 	return &c, err
 }
 
-// parseGVMSC retrieves GVMS connection configuration.
+// parseEncryption retrieves GVMS connection configuration.
 func parseEncryption() (*config.Encryption, error) {
 	var c config.Encryption
 	err := viper.Unmarshal(&c)

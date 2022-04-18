@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -14,8 +13,9 @@ import (
 // Service handles the communication between a command request and the associated
 // client service.
 type Service struct {
-	Name    string
-	BaseURI string
+	Name     string
+	BaseURI  string
+	Endpoint string
 }
 
 // Command sets up the schema for a command request via the name of a command and its
@@ -41,7 +41,7 @@ type CommandResponse struct {
 func GenerateServices(c *config.Services) []Service {
 	services := []Service{}
 	for _, s := range c.Services {
-		services = append(services, Service{Name: s.Name, BaseURI: s.BaseURI})
+		services = append(services, Service{Name: s.Name, BaseURI: s.BaseURI, Endpoint: s.Endpoint})
 	}
 
 	return services
@@ -56,7 +56,7 @@ func (s Service) Execute(c *Command) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/cmd", s.BaseURI), bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", s.BaseURI+s.Endpoint, bytes.NewBuffer(data))
 	if err != nil {
 		return "", err
 	}

@@ -80,10 +80,12 @@ this schematic
   - "client number n"
 ```
 
-As of now, a client service must expose the `/cmd` endpoint for the POST method.
-Arguments will be passed in as JSON as `{args: [...]}` via an arg array in the exact same
-order they were sent by the client number. The endpoint must return a response with a message
-defined in the `message` key. Optionally, an error can be returned via the `error` key
+As of now, a client service must expose the `/cmd` endpoint for the POST method. However, it
+is possible to specify an alternative endpoint by setting the `endpoint` key for a service within
+the `cot_sm.yaml` configuration file. Arguments will be passed in as JSON as `{args: [...]}` via
+an arg array in the exact same order they were sent by the client number. The endpoint must return
+a response with a message defined in the `message` key. Optionally, an error can be returned via
+the `error` key
 ```json
 {
     "message": "",
