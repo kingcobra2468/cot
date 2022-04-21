@@ -7,7 +7,7 @@ ARG cot_passphrase=
 ARG cot_cn_public_key_dir=
 ARG cot_sig_verification=
 ARG cot_base64_encoding=
-ARG cot_conf_dir=
+ARG cot_conf_dir=/cot/config
 
 ENV COT_TEXT_ENCRYPTION=${cot_text_encryption}
 ENV COT_PUBLIC_KEY_FILE=${cot_public_key_file}
@@ -21,8 +21,12 @@ ENV COT_CONF_DIR=${cot_conf_dir}
 WORKDIR /go/src/app
 COPY . .
 
+RUN mkdir -p /cot/config
+
 RUN go get -d -v ./...
 RUN go install -v ./...
 RUN go build
+
+VOLUME /cot/config
 
 CMD ["cot", "-logtostderr=true"]
