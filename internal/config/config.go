@@ -16,10 +16,28 @@ type Services struct {
 // as well as the service base URI. Also contains a list of client numbers authorized
 // to use this service.
 type Service struct {
-	Name          string   `mapstructure:"name"`
-	BaseURI       string   `mapstructure:"base_uri"`
-	Endpoint      string   `mapstructure:"endpoint"`
-	ClientNumbers []string `mapstructure:"client_numbers"`
+	Name          string     `mapstructure:"name"`
+	BaseURI       string     `mapstructure:"base_uri"`
+	Endpoint      string     `mapstructure:"base_endpoint"`
+	ClientNumbers []string   `mapstructure:"client_numbers"`
+	Commands      []*Command `mapstructure:"commands"`
+}
+
+// Command contains the signature for each of the subcommands. This includes the pattern
+// that determines if the command exists from the user input, as well as various metadata
+// in regards to how to send that command to a given client service.
+type Command struct {
+	Pattern  string       `mapstructure:"pattern"`
+	Method   string       `mapstructure:"method"`
+	Endpoint string       `mapstructure:"endpoint"`
+	Args     map[int]*Arg `mapstructure:"args"`
+}
+
+// Arg contains info on the mapping between the positional arguments passed in by the user
+// into a more complex type that can be sent off to the client service.
+type Arg struct {
+	Path string `mapstructure:"path"`
+	Type string `mapstructure:"type"`
 }
 
 // Encryption contains configuration on various options for encryption and files
