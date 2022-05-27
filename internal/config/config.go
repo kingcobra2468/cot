@@ -18,6 +18,7 @@ type Services struct {
 type Service struct {
 	Name          string     `mapstructure:"name"`
 	BaseURI       string     `mapstructure:"base_uri"`
+	Method        string     `mapstructure:"method"`
 	Endpoint      string     `mapstructure:"base_endpoint"`
 	ClientNumbers []string   `mapstructure:"client_numbers"`
 	Commands      []*Command `mapstructure:"commands"`
@@ -27,17 +28,16 @@ type Service struct {
 // that determines if the command exists from the user input, as well as various metadata
 // in regards to how to send that command to a given client service.
 type Command struct {
-	Pattern  string       `mapstructure:"pattern"`
-	Method   string       `mapstructure:"method"`
-	Endpoint string       `mapstructure:"endpoint"`
-	Args     map[int]*Arg `mapstructure:"args"`
+	Pattern  string            `mapstructure:"pattern"`
+	Method   string            `mapstructure:"method"`
+	Endpoint string            `mapstructure:"endpoint"`
+	Args     map[int]*TypeInfo `mapstructure:"args"`
+	Response TypeInfo          `mapstructure:"response"`
 }
 
-// Arg contains info on the mapping between the positional arguments passed in by the user
-// into a more complex type that can be sent off to the client service.
-type Arg struct {
-	Path string `mapstructure:"path"`
-	Type string `mapstructure:"type"`
+type TypeInfo struct {
+	Type      string `mapstructure:"type"`
+	Namespace string `mapstructure:"namespace"`
 }
 
 // Encryption contains configuration on various options for encryption and files

@@ -79,6 +79,7 @@ func main() {
 	if err != nil {
 		glog.Fatalln(err)
 	}
+
 	// read in gvms config and check integrity
 	gvms, err := parseGVMS()
 	if err != nil {
@@ -105,7 +106,11 @@ func main() {
 	done := make(chan struct{})
 
 	// create cache and register all services with it
-	services := service.GenerateServices(sc)
+	services, err := service.GenerateServices(sc)
+	if err != nil {
+		glog.Fatalln(err)
+	}
+
 	serviceCache := service.NewCache()
 	serviceCache.Add(services...)
 
