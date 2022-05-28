@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -84,6 +85,7 @@ const (
 	StringType
 	IntType
 	FloatType
+	BoolType
 )
 
 var supportedMethods = MethodSet{
@@ -208,6 +210,8 @@ func parseArgDataType(t string) (ArgDataType, error) {
 		return IntType, nil
 	case "float", "double":
 		return FloatType, nil
+	case "bool", "boolean":
+		return BoolType, nil
 	default:
 		return InvalidType, fmt.Errorf("invalid arg datatype detected \"%s\"", t)
 	}
@@ -269,8 +273,32 @@ func (sc Command) jsonString(c *UserInput) (string, error) {
 		return "", nil
 	}
 
-	for idx, arg := range (*sc.Args)[JsonArg] {
-		json.SetP(c.Args[idx], arg.Path)
+	for idx, argInfo := range (*sc.Args)[JsonArg] {
+		switch argInfo.DataType {
+		case StringType:
+			json.SetP(c.Args[idx], argInfo.Path)
+		case IntType:
+			arg, err := strconv.ParseInt(c.Args[idx], 10, 64)
+			if err != nil {
+				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
+			}
+
+			json.SetP(arg, argInfo.Path)
+		case FloatType:
+			arg, err := strconv.ParseFloat(c.Args[idx], 64)
+			if err != nil {
+				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
+			}
+
+			json.SetP(arg, argInfo.Path)
+		case BoolType:
+			arg, err := strconv.ParseBool(c.Args[idx])
+			if err != nil {
+				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
+			}
+
+			json.SetP(arg, argInfo.Path)
+		}
 	}
 
 	return json.String(), nil

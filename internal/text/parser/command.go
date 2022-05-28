@@ -16,7 +16,6 @@ var (
 // Parse parses the input text into an instance of a Command.
 func Parse(text string) (*service.UserInput, error) {
 	tokens := strings.Fields(text)
-
 	if len(tokens) == 0 {
 		return nil, errUnparsableCommand
 	}
