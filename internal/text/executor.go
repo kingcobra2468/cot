@@ -51,7 +51,7 @@ func (e Executor) runCommand(l *Listener) {
 		if !ok {
 			glog.Errorf("unable to fetch client from %s's service pool", command.Name)
 		}
-		glog.Infof("executed \"%s\" with args \"%v\"", command.Name, command.Arguments)
+		glog.Infof("executed \"%s\" with args \"%v\"", command.Name, command.Args)
 
 		message, err := client.Execute(&command)
 		if err != nil {

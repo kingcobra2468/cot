@@ -43,10 +43,6 @@ func parseServices() (*config.Services, error) {
 	var c config.Services
 	err := viper.Unmarshal(&c)
 
-	for _, s := range c.Services {
-		s.SetDefaultEndpoint("/cmd")
-	}
-
 	return &c, err
 }
 

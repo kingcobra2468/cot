@@ -18,8 +18,6 @@ type Services struct {
 type Service struct {
 	Name          string     `mapstructure:"name"`
 	BaseURI       string     `mapstructure:"base_uri"`
-	Method        string     `mapstructure:"method"`
-	Endpoint      string     `mapstructure:"base_endpoint"`
 	ClientNumbers []string   `mapstructure:"client_numbers"`
 	Commands      []*Command `mapstructure:"commands"`
 }
@@ -28,16 +26,29 @@ type Service struct {
 // that determines if the command exists from the user input, as well as various metadata
 // in regards to how to send that command to a given client service.
 type Command struct {
-	Pattern  string            `mapstructure:"pattern"`
-	Method   string            `mapstructure:"method"`
-	Endpoint string            `mapstructure:"endpoint"`
-	Args     map[int]*TypeInfo `mapstructure:"args"`
-	Response TypeInfo          `mapstructure:"response"`
+	Pattern  string   `mapstructure:"pattern"`
+	Method   string   `mapstructure:"method"`
+	Endpoint string   `mapstructure:"endpoint"`
+	Args     *[]Arg   `mapstructure:"args"`
+	Response Response `mapstructure:"response"`
+}
+
+type Arg struct {
+	TypeInfo     `mapstructure:",squash"`
+	Index        int    `mapstructure:"index"`
+	Type         string `mapstructure:"type"`
+	CompressRest bool   `mapstructure:"compress_rest"`
+}
+
+type Response struct {
+	Type    string   `mapstructure:"type"`
+	Success TypeInfo `mapstructure:"success"`
+	Error   TypeInfo `mapstructure:"error"`
 }
 
 type TypeInfo struct {
-	Type      string `mapstructure:"type"`
-	Namespace string `mapstructure:"namespace"`
+	Path     string `mapstructure:"path"`
+	DataType string `mapstructure:"datatype"`
 }
 
 // Encryption contains configuration on various options for encryption and files
@@ -56,10 +67,4 @@ type Encryption struct {
 type GVMS struct {
 	Hostname string `mapstructure:"hostname"`
 	Port     int    `mapstructure:"port"`
-}
-
-func (s *Service) SetDefaultEndpoint(endpoint string) {
-	if len(s.Endpoint) == 0 {
-		s.Endpoint = endpoint
-	}
 }
