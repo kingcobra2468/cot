@@ -167,10 +167,10 @@ func generateSubCommand(cmdInfo *config.Command) (*Command, error) {
 }
 
 func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
-	fmt.Println(argInfo)
 	ag := make(ArgGroups)
 	ag[QueryArg] = make(ArgBindings)
 	ag[JsonArg] = make(ArgBindings)
+	argCompress := false
 
 	for _, arg := range *argInfo {
 		t, err := parseArgType(arg.Type)
@@ -183,6 +183,12 @@ func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 		}
 		if t == JsonArg && strings.EqualFold("get", method) {
 			return nil, fmt.Errorf("arg index %d for path %s cannot exist for GET requests", arg.Index, arg.Path)
+		}
+
+		if argCompress && arg.CompressRest {
+			return nil, errors.New("it is not possible to perform arg compression more than once on a single command")
+		} else if arg.CompressRest {
+			argCompress = true
 		}
 
 		ag[t][arg.Index] = &Arg{Type: t, Compress: arg.CompressRest, TypeInfo: TypeInfo{DataType: dt, Path: arg.Path}}
@@ -258,6 +264,11 @@ func (sc Command) queryString(c *UserInput) (string, error) {
 
 	for idx, arg := range (*sc.Args)[QueryArg] {
 		query.Add(arg.Path, c.Args[idx])
+		if arg.Compress {
+			for i := idx + 1; i < len(c.Args)-1; i++ {
+				query.Add(arg.Path, c.Args[i])
+			}
+		}
 	}
 
 	return query.Encode(), nil
@@ -274,31 +285,37 @@ func (sc Command) jsonString(c *UserInput) (string, error) {
 	}
 
 	for idx, argInfo := range (*sc.Args)[JsonArg] {
+		var arg interface{}
+		var err error
+
+		if argInfo.Compress {
+			for i := idx; i < len(c.Args); i++ {
+				json.ArrayAppendP(c.Args[i], argInfo.Path)
+			}
+			break
+		}
+
 		switch argInfo.DataType {
 		case StringType:
-			json.SetP(c.Args[idx], argInfo.Path)
+			arg = c.Args[idx]
 		case IntType:
-			arg, err := strconv.ParseInt(c.Args[idx], 10, 64)
+			arg, err = strconv.ParseInt(c.Args[idx], 10, 64)
 			if err != nil {
 				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
 			}
-
-			json.SetP(arg, argInfo.Path)
 		case FloatType:
-			arg, err := strconv.ParseFloat(c.Args[idx], 64)
+			arg, err = strconv.ParseFloat(c.Args[idx], 64)
 			if err != nil {
-				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
+				return "", fmt.Errorf("unable to parse arg %s into an float", c.Args[idx])
 			}
-
-			json.SetP(arg, argInfo.Path)
 		case BoolType:
-			arg, err := strconv.ParseBool(c.Args[idx])
+			arg, err = strconv.ParseBool(c.Args[idx])
 			if err != nil {
-				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
+				return "", fmt.Errorf("unable to parse arg %s into an boolean", c.Args[idx])
 			}
-
-			json.SetP(arg, argInfo.Path)
 		}
+
+		json.SetP(arg, argInfo.Path)
 	}
 
 	return json.String(), nil
