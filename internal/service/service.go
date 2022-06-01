@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,6 +73,7 @@ const (
 	InvalidArg ArgType = iota
 	QueryArg
 	JsonArg
+	EndpointArg
 )
 
 const (
@@ -170,6 +172,8 @@ func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 	ag := make(ArgGroups)
 	ag[QueryArg] = make(ArgBindings)
 	ag[JsonArg] = make(ArgBindings)
+	ag[EndpointArg] = make(ArgBindings)
+
 	argCompress := false
 
 	for _, arg := range *argInfo {
@@ -203,6 +207,8 @@ func parseArgType(t string) (ArgType, error) {
 		return QueryArg, nil
 	case "json":
 		return JsonArg, nil
+	case "endpoint":
+		return EndpointArg, nil
 	default:
 		return InvalidArg, fmt.Errorf("invalid arg type detected \"%s\"", t)
 	}
@@ -321,6 +327,24 @@ func (sc Command) jsonString(c *UserInput) (string, error) {
 	return json.String(), nil
 }
 
+func (sc Command) endpointString(c *UserInput) (string, error) {
+	endpoint := []string{}
+	argCount := len((*sc.Args)[EndpointArg])
+	if argCount > len(c.Args) {
+		return "", errors.New("unable to parse input command due to invalid among of input args")
+	}
+
+	if argCount == 0 {
+		return "", nil
+	}
+
+	for idx, _ := range (*sc.Args)[EndpointArg] {
+		endpoint = append(endpoint, c.Args[idx])
+	}
+
+	return strings.Join(endpoint, "/"), nil
+}
+
 // Execute will push the command request to the associated client service and will
 // retrieve the output.
 func (s Service) Execute(ui *UserInput) (string, error) {
@@ -358,6 +382,10 @@ func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) 
 	if err != nil {
 		return nil, err
 	}
+	endpoint, err := c.endpointString(ui)
+	if err != nil {
+		return nil, err
+	}
 
 	var serializedJson *bytes.Buffer
 	if len(json) != 0 {
@@ -365,7 +393,7 @@ func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) 
 	}
 	fmt.Println("Q ", query)
 	fmt.Println("J ", json)
-	req, err := http.NewRequest(c.Method, s.BaseURI+c.Endpoint, serializedJson)
+	req, err := http.NewRequest(c.Method, path.Join(s.BaseURI, c.Endpoint, endpoint), serializedJson)
 	if err != nil {
 		return nil, err
 	}
