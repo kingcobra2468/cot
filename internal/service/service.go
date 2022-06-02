@@ -17,11 +17,24 @@ import (
 	"github.com/kingcobra2468/cot/internal/config"
 )
 
+// Command input arg type.
 type ArgType int8
+
+// Command input arg datatype.
 type ArgDataType int8
+
+// Command output response type.
 type ResponseType int8
+
+// Mapping between the positional index of an argument of the input command and
+// its corresponding metadata.
 type ArgBindings map[int]*Arg
+
+// The set of supported HTTP methods when sending commands to a client service.
 type MethodSet map[string]struct{}
+
+// Mapping between a command input arg type and the corresponding arguments for that
+// given arg type.
 type ArgGroups map[ArgType]ArgBindings
 
 // Service handles the communication between a command request and the associated
@@ -40,11 +53,17 @@ type UserInput struct {
 	Raw  string
 }
 
+// Commands represents the global schematics of all commands for a given client service.
 type Commands struct {
+	// All command patterns for a given client service.
 	Patterns []string
-	Meta     map[string]*Command
+	// Mapping between a given pattern and command metadata.
+	Meta map[string]*Command
 }
 
+// Command represents the metadata of a given command. This provides information on how
+// and where to perform the HTTP call, how to process the input command, as well
+// as how to process the client service output.
 type Command struct {
 	Method   string
 	Endpoint string
@@ -52,44 +71,73 @@ type Command struct {
 	Args     *ArgGroups
 }
 
+// Arg represents the metadata about a given input command argument.
 type Arg struct {
 	TypeInfo
-	Type     ArgType
+	Type ArgType
+	// Whether to compress the rest of the commands from the input command into an array
+	// under this argument.s
 	Compress bool
 }
 
+// TypeInfo describes the metadata about a given argument and response attribute.
 type TypeInfo struct {
 	DataType ArgDataType
 	Path     string
 }
 
+// Response describes how to process the output of the client service and address
+// cases of successful and erroneous output.
 type Response struct {
 	Type    ResponseType
 	Success TypeInfo
 	Error   TypeInfo
 }
 
+// ArgType lists the different ways that the arguments of an input command can
+// be parsed.
 const (
+	// InvalidArg describes an argument whose type that was specified in the configuration
+	// but does not exist within cot.
 	InvalidArg ArgType = iota
+	// QueryArg describes an argument that is designated for the query params.
 	QueryArg
+	// JsonArg describes an argument that is designated for the JSON body.
 	JsonArg
+	// EndpointArg describes an argument that will be used to construct the endpoint URL.
 	EndpointArg
 )
 
+// ResponseType lists the different ways in which the client service command output can
+// be processed.
 const (
+	// InvalidResponse describes a response type that was specified for a given command
+	// but does not exist within cot.
 	InvalidResponse ResponseType = iota
+	// PlainTextResponse describes a response type where the raw response is sent back to
+	// the user.
 	PlainTextResponse
+	// JsonResponse describes a response type where the output will be further processed
+	// through JSON.
 	JsonResponse
 )
 
+// ArgDataType lists the different types of data types that are supported when casting
+// the raw input/output into the select types.
 const (
+	// InvalidType describes a type that was specified but does not exist within cot.
 	InvalidType ArgDataType = iota
+	// StringType describes that the cast will be made to the string type.
 	StringType
+	// IntType describes that the cast will be made to the int type.
 	IntType
+	// FloatType describes that the cast will be made to the float type.
 	FloatType
+	// BoolType describes that the cast will be made to the bool type.
 	BoolType
 )
 
+// supportedMethods describes the different HTTP methods that are supported by cot.
 var supportedMethods = MethodSet{
 	"get":    struct{}{},
 	"post":   struct{}{},
@@ -99,7 +147,7 @@ var supportedMethods = MethodSet{
 }
 
 // GenerateServices creates a list of services that were specified
-// in the configuration file.
+// from the configuration file.
 func GenerateServices(c *config.Services) ([]Service, error) {
 	services := []Service{}
 	for _, s := range c.Services {
@@ -128,6 +176,7 @@ func GenerateServices(c *config.Services) ([]Service, error) {
 	return services, nil
 }
 
+// generateSubCommand parses and validates the command from the configuration file.
 func generateSubCommand(cmdInfo *config.Command) (*Command, error) {
 	args, err := generateArgs(cmdInfo.Args, cmdInfo.Method)
 	if err != nil {
@@ -138,6 +187,7 @@ func generateSubCommand(cmdInfo *config.Command) (*Command, error) {
 		return nil, fmt.Errorf("found an invalid method %s", cmdInfo.Method)
 	}
 
+	// if no command pattern is specified, then match any pattern
 	if len(cmdInfo.Pattern) == 0 {
 		cmdInfo.Pattern = ".*"
 	}
@@ -168,12 +218,13 @@ func generateSubCommand(cmdInfo *config.Command) (*Command, error) {
 	return &sc, nil
 }
 
+// generateArgs parses and validates the arguments that were specified in the configuration
+// file of a given command. The arguments are then preprocessed abd aggregated into similar types.
 func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 	ag := make(ArgGroups)
 	ag[QueryArg] = make(ArgBindings)
 	ag[JsonArg] = make(ArgBindings)
 	ag[EndpointArg] = make(ArgBindings)
-
 	argCompress := false
 
 	for _, arg := range *argInfo {
@@ -195,12 +246,16 @@ func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 			argCompress = true
 		}
 
+		// adds a given argument to a given arg group and points it to the positional
+		// index of the input command
 		ag[t][arg.Index] = &Arg{Type: t, Compress: arg.CompressRest, TypeInfo: TypeInfo{DataType: dt, Path: arg.Path}}
 	}
 
 	return &ag, nil
 }
 
+// parseArgType processes the raw arg type from the configuration file into one of the
+// supported types.
 func parseArgType(t string) (ArgType, error) {
 	switch t {
 	case "query":
@@ -214,6 +269,7 @@ func parseArgType(t string) (ArgType, error) {
 	}
 }
 
+// parseArgDataType processes the raw data type into one of the supported data types.
 func parseArgDataType(t string) (ArgDataType, error) {
 	switch t {
 	case "str", "string":
@@ -229,6 +285,8 @@ func parseArgDataType(t string) (ArgDataType, error) {
 	}
 }
 
+// parseResponseType processes the raw response type into one of the supported response
+// types.
 func parseResponseType(t string) (ResponseType, error) {
 	switch t {
 	case "plain_text":
@@ -240,6 +298,7 @@ func parseResponseType(t string) (ResponseType, error) {
 	}
 }
 
+// methodExists checks to see if the specified HTTP method is supported by cot.
 func methodExists(method string) bool {
 	method = strings.ToLower(method)
 	_, isValid := supportedMethods[method]
@@ -247,6 +306,8 @@ func methodExists(method string) bool {
 	return isValid
 }
 
+// findSubCmd maps the input command into a client service command by doing
+// a check of the command pattern.
 func (sc Commands) findSubCmd(c *UserInput) (*Command, error) {
 	for _, p := range sc.Patterns {
 		if found, err := regexp.MatchString(p, c.Raw); err == nil && found {
@@ -257,6 +318,7 @@ func (sc Commands) findSubCmd(c *UserInput) (*Command, error) {
 	return nil, errors.New("unable to find a valid subcommand from the input command")
 }
 
+// queryString aggregates all of the query arguments from the input command.
 func (sc Command) queryString(c *UserInput) (string, error) {
 	query := url.Values{}
 	argCount := len((*sc.Args)[QueryArg])
@@ -280,6 +342,7 @@ func (sc Command) queryString(c *UserInput) (string, error) {
 	return query.Encode(), nil
 }
 
+// jsonString aggregates all of the json body arguments from the input command.
 func (sc Command) jsonString(c *UserInput) (string, error) {
 	json := gabs.New()
 	argCount := len((*sc.Args)[JsonArg])
@@ -327,6 +390,7 @@ func (sc Command) jsonString(c *UserInput) (string, error) {
 	return json.String(), nil
 }
 
+// endpointString aggregates all of the endpoint arguments into the endpoint URL
 func (sc Command) endpointString(c *UserInput) (string, error) {
 	endpoint := []string{}
 	argCount := len((*sc.Args)[EndpointArg])
@@ -373,6 +437,9 @@ func (s Service) Execute(ui *UserInput) (string, error) {
 	return msg, nil
 }
 
+// setupRequest prepares for the client service command request by parsing the user command.
+// Preprocessing is then preformed to prepare the request based on the criteria specified for
+// the command.
 func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) {
 	query, err := c.queryString(ui)
 	if err != nil {
@@ -388,6 +455,7 @@ func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) 
 	}
 
 	var serializedJson *bytes.Buffer = bytes.NewBuffer([]byte{})
+	// check if any json args exist for the given command
 	if len(json) > 0 {
 		serializedJson = bytes.NewBuffer([]byte(json))
 	}
@@ -411,6 +479,8 @@ func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) 
 	return req, nil
 }
 
+// processResponse processes the client service command output based on the criteria
+// specified for the command.
 func (s Service) processResponse(c *Command, resp *http.Response) (string, error) {
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -433,8 +503,7 @@ func (s Service) processResponse(c *Command, resp *http.Response) (string, error
 	default:
 		respPath = c.Response.Error.Path
 	}
-
 	msg := output.Path(respPath).String()
-	fmt.Println(msg)
+
 	return msg, nil
 }

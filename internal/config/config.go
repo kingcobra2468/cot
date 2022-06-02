@@ -33,6 +33,7 @@ type Command struct {
 	Response Response `mapstructure:"response"`
 }
 
+// Arg represents argument config for a given command of a given client service.
 type Arg struct {
 	TypeInfo     `mapstructure:",squash"`
 	Index        int    `mapstructure:"index"`
@@ -40,12 +41,14 @@ type Arg struct {
 	CompressRest bool   `mapstructure:"compress_rest"`
 }
 
+// Response contains the configuration of the response signature of a given command.
 type Response struct {
 	Type    string   `mapstructure:"type"`
 	Success TypeInfo `mapstructure:"success"`
 	Error   TypeInfo `mapstructure:"error"`
 }
 
+// TypeInfo represents type info metadata for a given argument or response type.
 type TypeInfo struct {
 	Path     string `mapstructure:"path"`
 	DataType string `mapstructure:"datatype"`
