@@ -163,7 +163,7 @@ func generateSubCommand(cmdInfo *config.Command) (*Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	sc.Response.Success = TypeInfo{DataType: edt, Path: cmdInfo.Response.Error.Path}
+	sc.Response.Error = TypeInfo{DataType: edt, Path: cmdInfo.Response.Error.Path}
 
 	return &sc, nil
 }
@@ -338,7 +338,7 @@ func (sc Command) endpointString(c *UserInput) (string, error) {
 		return "", nil
 	}
 
-	for idx, _ := range (*sc.Args)[EndpointArg] {
+	for idx := range (*sc.Args)[EndpointArg] {
 		endpoint = append(endpoint, c.Args[idx])
 	}
 
@@ -387,13 +387,12 @@ func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) 
 		return nil, err
 	}
 
-	var serializedJson *bytes.Buffer
-	if len(json) != 0 {
+	var serializedJson *bytes.Buffer = bytes.NewBuffer([]byte{})
+	if len(json) > 0 {
 		serializedJson = bytes.NewBuffer([]byte(json))
 	}
-	fmt.Println("Q ", query)
-	fmt.Println("J ", json)
-	req, err := http.NewRequest(c.Method, path.Join(s.BaseURI, c.Endpoint, endpoint), serializedJson)
+
+	req, err := http.NewRequest(strings.ToUpper(c.Method), s.BaseURI+path.Join(c.Endpoint, endpoint), serializedJson)
 	if err != nil {
 		return nil, err
 	}
@@ -429,16 +428,13 @@ func (s Service) processResponse(c *Command, resp *http.Response) (string, error
 
 	var respPath string
 	switch resp.StatusCode {
-	case 200:
+	case http.StatusOK:
 		respPath = c.Response.Success.Path
 	default:
 		respPath = c.Response.Error.Path
 	}
 
-	msg, ok := output.Path(respPath).Data().(string)
-	if !ok {
-		return "", errors.New("unable to parse output json")
-	}
-
+	msg := output.Path(respPath).String()
+	fmt.Println(msg)
 	return msg, nil
 }

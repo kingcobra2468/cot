@@ -52,18 +52,20 @@ func (e Executor) runCommand(l *Listener) {
 			glog.Errorf("unable to fetch client from %s's service pool", command.Name)
 		}
 		glog.Infof("executed \"%s\" with args \"%v\"", command.Name, command.Args)
-
-		message, err := client.Execute(&command)
+		msg, err := client.Execute(&command)
+		// undo any existing encoding on quotes
+		msg = strings.ReplaceAll(msg, "\\\"", "\"")
+		// encode all quotes
+		msg = strings.ReplaceAll(msg, "\"", "\\\"")
+		// remove all newlines as they cannot exist when sending messages with gvms
+		msg = strings.ReplaceAll(msg, "\n", "")
 		if err != nil {
-			msg := err.Error()
-			// fix encoding issues when sending errors
-			msg = strings.ReplaceAll(msg, "\"", "\\\"")
-			msg = strings.ReplaceAll(msg, "\n", "")
-			l.SendText(msg)
+			errMsg := err.Error()
+			l.SendText(errMsg)
 		} else {
-			l.SendText(message)
+			l.SendText(msg)
 		}
 
-		clientPool.Put(client)
+		clientPool.Put(&client)
 	}
 }
