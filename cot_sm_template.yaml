@@ -1,9 +1,46 @@
-gvoice_number: 0
-services:
-  - name: name
-    base_uri: "http://localhost"
-    client_numbers:
-    - 0
+---
 gvms:
-  hostname: "localhost"
-  port: 0
+  hostname: "192.168.1.10"
+  port: 7777
+gvoice_number: 11111111111
+services:
+  - name: car
+    base_uri: "http://192.168.1.11:8086"
+    client_numbers:
+      - 12222222222
+    commands:
+      - args:
+          - datatype: str
+            type: endpoint
+            index: 1
+          - datatype: int
+            path: price.current
+            type: json
+            index: 2
+            compress_rest: true
+        endpoint: /cars
+        method: put
+        pattern: .*changeprice.*
+        response:
+          type: json
+          success:
+            datatype: str
+            path: data
+          error:
+            datatype: str
+            path: data
+      - args:
+          - datatype: str
+            type: endpoint
+            index: 1
+        endpoint: /cars
+        method: delete
+        pattern: .*remove.*
+        response:
+          type: json
+          success:
+            datatype: str
+            path: data
+          error:
+            datatype: str
+            path: data

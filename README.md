@@ -1,13 +1,7 @@
 # **COT**
-Commands over text(COT) is bridge for sending user-defined commands over the SMS/MMS
-protocol. This offers and alternative method for sending commands without the need
-to do any port forwarding.
-
-COT's generic architecture allows it to avoid any coupling with the would be
-commands as each command is executed via an external client service. Thus, COT
-only needs to know the bindings and will propagate the command request to the
-actual client service which will contain the appropriate logic for dealing with
-the request.
+Commands over text(COT) is platform for bridging internal services and mobile users
+over the SMS/MMS protocol. Through a rich and programmable interface, one is able to define
+and fine-tune commands designated to internal services without doing any port-forwarding. 
 
 COT's main benefit arises with the ability to interact with internal services without
 the need to do any port forwarding or exposure to the public internet. Thus, with COT
@@ -28,73 +22,30 @@ on to the internal services.
 
 COT, being generic, enables one to create any command they want as long as one defines
 it within `cot_sm.yaml`. Within the config file, one would specify:
-1. Name of the command.
-2. Client service that will execute the command.
-3. List of client numbers authorized to use the command.
+1. The name of the service and a list of commands that hit various endpoints of such service.
+2. List of client numbers authorized to use the command.
 
-### **Flow**
-The end-to-end flow starting from the client number is as follows:
-1. Client sends command in "[cmd] [arg 1] [arg 2] ... [arg N]" format to the configured
-   GVoice number.
-3. COT would have initialized a worker that checks the (GVoice Number, Client Number)
-   link periodically via GVMS. By listening to only the subnet of defined client numbers,
+## **Flow**
+The end-to-end flow of COT is as follows:
+1. COT initializes a worker that checks the (GVoice Number, Client Number)
+   link periodically by polling GVMS. *By listening to only the subnet of defined client numbers,
    COT, by nature, will ignore all numbers that have not been whitelisted by any of the
-   services within `cot_sm.yaml`.
-4. COT parsers the command and checks if the client number is authorized to run this command.
-   Non-authorized commands will be rejected.
-5. The arguments of the command will be sent as an array of args to the client service's endpoint
-   that was defined for that specified command within `cot_sm.yaml`.
-6. The output of the command would then be transmitted back to the client number.
-
-#### **Example**
-Assuming these commands are the only commands defined within `cot_sm.yaml`
-```yaml
-services:
-  - name: lights
-    base_uri: "http://localhost:9877"
-    client_numbers:
-    - 1415111111
-  - name: email
-    base_uri: "http://localhost:9876"
-    client_numbers:
-    - 1415111111
-    - 1415111112
-```
-
-If `1415111111` sends a command such as "lights off", COT will verify that this number is
-authorized and will send `{args: "off"}` to `/cmd` endpoint of `http://localhost:9877`.
-However, if `1415111112` tries to do the same, the request will fail as it is not authorized.
-Likewise, another number `1415111113` will fail regardless of the `lights` or `email` command as
-they are not authorized for either. All 3 numbers will be rejected for any other commands as
-no other commands exist.
-
-## **Defining Commands & Associated Client Services**
-All commands are defined as list items under the `services:` section. Each command must follow
-this schematic
-```yaml
-- name: "name of command"
-  base_uri: "base uri of server executing the command"
-  client_numbers:
-  - "client number 1"
-  - "...."
-  - "client number n"
-```
-
-As of now, a client service must expose the `/cmd` endpoint for the POST method. However, it
-is possible to specify an alternative endpoint by setting the `endpoint` key for a service within
-the `cot_sm.yaml` configuration file. Arguments will be passed in as JSON as `{args: [...]}` via
-an arg array in the exact same order they were sent by the client number. The endpoint must return
-a response with a message defined in the `message` key. Optionally, an error can be returned via
-the `error` key
-```json
-{
-    "message": "",
-    "error": "optional"
-}
-```
+   services within `cot_sm.yaml`.*
+2. A client sends a command in the format "[cmd] [arg 0] [arg 1] ... [arg N]" (split into tokens by 
+   the space delimiter) to a GVoice number that COT polls.
+3. On detection of a new user command, COT parsers the command and checks if the client number is
+   authorized to run this command. Non-authorized commands will be rejected. Likewise, COT also checks
+   if the command exists.
+4. COT tries to match the user command to a given command of a service by doing pattern checking against
+   the input. In the case were no patterns match, an error is returned. Otherwise, the arguments are
+   reformated into appropriate arg groups and the command is sent to the configured service + endpoint along
+   with the defined HTTP method. 
+5. The output of the command would then parsed based on the response configuration and is then sent back
+   to the client number.
 
 ## **Encryption**
 ![photo](images/cot_encryption.jpg)
+
 Given that the SMS/MMS protocol is the foundation for COT, all messages will be visible
 by default. This includes but is not limited to ATT, Verizon, Google (due to GVoice), among
 other parties. Thus, this pushes the need for encryption.
@@ -149,14 +100,152 @@ App Store/Play Store and do the steps themselves each time.
 
 ## **Configuration**
 
-### **Service & Command Configuration**
-Configuration is done via the `cot_sm.yaml` file which needs to be copied/renamed from 
+### **General Configuration**
+Most configuration is done via the `cot_sm.yaml` file which needs to be copied/renamed from 
 `cot_sm_template.yaml`. By default, the file needs to be located in the same directory as
 the executable or `main.go`, unless an alternate path is specified via the `COT_CONF_DIR`
-environment variable. Aside from defining services which were explained
-[here](#defining-user-commands), the gvoice number that all client numbers will be sending
-commands to needs to be defined via `gvoice_number`. Similarly, GVMS config needs to be defined
-which sets the binding of what hostname and port GVMS is running on.
+environment variable.
+
+#### **Sample Configuration**
+The best way to explain the configuration achievable with COT is through an example `cot_sm.yaml`
+file. Note that none of the data is real and the numbers are fake and should not be contacted. 
+```yaml
+---
+gvms:
+  hostname: "192.168.1.10"
+  port: 7777
+gvoice_number: 11111111111
+services:
+  - name: car
+    base_uri: "http://192.168.1.11:8086"
+    client_numbers:
+      - 12222222222
+    commands:
+      - args:
+          - datatype: str
+            type: endpoint
+            index: 1
+          - datatype: int
+            path: price.current
+            type: json
+            index: 2
+            compress_rest: true
+        endpoint: /cars
+        method: put
+        pattern: .*changeprice.*
+        response:
+          type: json
+          success:
+            datatype: str
+            path: data
+          error:
+            datatype: str
+            path: data
+      - args:
+          - datatype: str
+            type: endpoint
+            index: 1
+        endpoint: /cars
+        method: delete
+        pattern: .*remove.*
+        response:
+          type: json
+          success:
+            datatype: str
+            path: data
+          error:
+            datatype: str
+            path: data
+```
+The configuration above defines a single service. To send a command, a client number must
+send a text to `11111111111` which COT polls from GVMS. Here, GVMS runs on `192.168.1.10`
+with port `7777`. The single service, is represented by the command `car`. 
+
+The command `car` exposes two subcommands, one of which gets triggered when the user command
+contains `changeprice` while the other gets triggered when the user command contains `remove`.
+
+The first subcommand expects the user command to be `car changeprice [carname] price_1 price_2 ... price_n`.
+From the mapping, the raw command will be converted into a PUT request with the URL being
+`http://192.168.1.11:8086/cars/[carname]` with the payload being
+`{"price": {"current": [price_1, price_2, ..., price_n]}}`. The command will then return the contents of `data`
+key from the response JSON payload.
+
+The seconds subcommand expects the user command to be `car remove [carname]`. From the mapping, the raw command
+will be converted into a DELETE request with the URL being `http://192.168.1.11:8086/cars/`. The command will
+then return the contents of `data` key from the response JSON payload.
+
+#### **Reference**
+The reference contains all of possible fields within `cot_sm.yaml`. The fields are represented by their path
+from the root of the config file. So, for example `gvms.hostname` will represent:
+```yaml
+gvms:
+  hostname:
+```
+It is also important to know how COT does user command input parsing. COT parses the raw user input string into
+tokens that are split by space character. The first token corresponds to the service/base command name. The
+rest of the tokens correspond to args and are 0 indexed. When doing pattern patching of the command, the matching
+is done against the complete raw input, including the service/base command name.
+
+- **gvms.hostname** The hostname for GVMS.
+- **gvms.port** The port for GVMS.
+- **gvoice_number** The google voice number that client numbers need to send commands to
+  in order to be picked up by COT.
+- **services[].base_url** The base url used in the construction of an endpoint for a given service.
+- **services[].client_numbers[]** A list of client numbers that authorized for the client service. Each
+  client number must also include the country code.
+- **services[].commands[].endpoint** The endpoint that will be combined with the base_url to create the complete
+  the full path for a given comment.
+- **services[].commands[].method** The HTTP method to use for a given endpoint.
+- **services[].commands[].pattern** The regex pattern that is used to determine whether to run a command.
+- **services[].commands[].args[].datatype** The datatype of the underlying arg. Supported types are as follows:
+  - For strings, either "string" or "str" are accepted.
+  - For integers, either "integer" or "int" are accepted.
+  - For decimals, either "double" or "float" are accepted.
+  - For booleans, either "boolean" or "bool" are accepted.
+- **services[].commands[].args[].type** The arg class. Supported arg classes are:
+  - For query args, use "query".
+  - For JSON args, use "json".
+  - For endpoint args, use "endpoint".
+- **services[].commands[].args[].index** The mapping between a raw arg and the current
+  translation. 
+- **services[].commands[].args[].path** The JSON/query path to where place/get the arg. For endpoint args, this value
+  is ignored and can be removed.
+- **services[].commands[].args[].compress_rest** Whether to compress the rest of the input args from the current index
+  into an array of the given arg type. 
+- **services[].commands[].response.type** The response content type. Supported types are:
+  - For JSON response content type, which will enable for further response parsing for success and error cases
+    use "json".
+  - To simply return the raw response, use "plain_text". 
+- **services[].response.success** When type is set to "json", the path to retrieve the response content when
+  response status code is 200.
+- **services[].response.success** When type is set to "json", the path to retrieve the response content when
+  response status code is not 200.
+
+#### **Client Services**
+A client service sets up the base service on which specified commands are run against. Services
+are defined under the `services:` section in `cot_sm.yaml`. 
+
+The name of the service will service
+as the command name. Thus, if the name of the service is `ping` then all underlying commands
+will only apply when the `cmd` is `ping`.
+
+#### **Commands**
+Commands allow for a programmatic way of hitting different endpoints for a given service. A RESTful
+service might contain various endpoints, use different HTTP methods (e.g. GET, POST, ...), and make use of
+JSON, and query args for passing data. COT enables one to statically map each positional argument,
+starting from the argument right after the command name (the service name).
+
+To add a command to a service, append an entry to `commands` selection of the select service with the
+schema:
+```yaml
+endpoint: "the endpoint of the given service to call for the select command."
+method: "The HTTP method to use when calling the endpoint."
+pattern: "A regex pattern that is applied to the raw input command in order to identity the command."
+response:
+- "Schematics to define the response type as logic on how to handle success and erroneous responses."
+args:
+- "A list of args that perform the mapping of the raw args into corresponding arg groups."
+```
 
 ### **Encryption Configuration**
 The follow environment variables can be defined in the case were encryption is enabled. If
