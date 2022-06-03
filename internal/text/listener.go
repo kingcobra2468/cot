@@ -57,8 +57,8 @@ func NewListener(link gvoice.Link, encryption bool) (*Listener, error) {
 }
 
 // Fetch retrieves the set of new commands that arrived since the last sync.
-func (l *Listener) Fetch() *[]service.Command {
-	commands := []service.Command{}
+func (l *Listener) Fetch() *[]service.UserInput {
+	commands := []service.UserInput{}
 	texts, err := l.newTexts()
 	if err != nil || len(*texts) == 0 {
 		return &commands

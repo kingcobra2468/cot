@@ -3,6 +3,7 @@ module github.com/kingcobra2468/cot
 go 1.16
 
 require (
+	github.com/Jeffail/gabs v1.4.0
 	github.com/ProtonMail/gopenpgp/v2 v2.4.6
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/google/btree v1.0.0 // indirect
