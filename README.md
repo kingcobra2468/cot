@@ -218,34 +218,8 @@ is done against the complete raw input, including the service/base command name.
   - To simply return the raw response, use "plain_text". 
 - **services[].response.success** When type is set to "json", the path to retrieve the response content when
   response status code is 200.
-- **services[].response.success** When type is set to "json", the path to retrieve the response content when
+- **services[].response.error** When type is set to "json", the path to retrieve the response content when
   response status code is not 200.
-
-#### **Client Services**
-A client service sets up the base service on which specified commands are run against. Services
-are defined under the `services:` section in `cot_sm.yaml`. 
-
-The name of the service will service
-as the command name. Thus, if the name of the service is `ping` then all underlying commands
-will only apply when the `cmd` is `ping`.
-
-#### **Commands**
-Commands allow for a programmatic way of hitting different endpoints for a given service. A RESTful
-service might contain various endpoints, use different HTTP methods (e.g. GET, POST, ...), and make use of
-JSON, and query args for passing data. COT enables one to statically map each positional argument,
-starting from the argument right after the command name (the service name).
-
-To add a command to a service, append an entry to `commands` selection of the select service with the
-schema:
-```yaml
-endpoint: "the endpoint of the given service to call for the select command."
-method: "The HTTP method to use when calling the endpoint."
-pattern: "A regex pattern that is applied to the raw input command in order to identity the command."
-response:
-- "Schematics to define the response type as logic on how to handle success and erroneous responses."
-args:
-- "A list of args that perform the mapping of the raw args into corresponding arg groups."
-```
 
 ### **Encryption Configuration**
 The follow environment variables can be defined in the case were encryption is enabled. If
