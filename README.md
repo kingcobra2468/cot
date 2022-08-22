@@ -197,6 +197,7 @@ is done against the complete raw input, including the service/base command name.
   the full path for a given comment.
 - **services[].commands[].method** The HTTP method to use for a given endpoint.
 - **services[].commands[].pattern** The regex pattern that is used to determine whether to run a command.
+  If a service has a single subcommand, this field can be skipped (regex `.*` will be applied).
 - **services[].commands[].args[].datatype** The datatype of the underlying arg. Supported types are as follows:
   - For strings, either "string" or "str" are accepted.
   - For integers, either "integer" or "int" are accepted.

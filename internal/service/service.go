@@ -157,6 +157,10 @@ func GenerateServices(c *config.Services) ([]Service, error) {
 		subCommands.Patterns = []string{}
 
 		for _, cmd := range s.Commands {
+			if cmd.Pattern == "" {
+				cmd.Pattern = ".*"
+			}
+
 			subCommands.Patterns = append(subCommands.Patterns, cmd.Pattern)
 			sc, err := generateSubCommand(cmd)
 			if err != nil {
