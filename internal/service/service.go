@@ -331,6 +331,8 @@ func (sc Commands) findSubCmd(c *UserInput) (*Command, error) {
 	return nil, errors.New("unable to find a valid subcommand from the input command")
 }
 
+//check will perform a lookup of a raw arg value against a filter list to see if it is
+// allowed.
 func (a Arg) check(ra string) error {
 	if !a.FilterEnabled {
 		return nil
