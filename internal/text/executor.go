@@ -46,8 +46,7 @@ func (e Executor) runCommand(l *Listener) {
 			glog.Warningf("invalid command \"%s\" found", command.Name)
 			continue
 		}
-
-		client, ok := clientPool.Get().(service.Service)
+		client, ok := clientPool.Get().(*service.Service)
 		if !ok {
 			glog.Errorf("unable to fetch client from %s's service pool", command.Name)
 			l.SendText("internal error, try later")
@@ -72,6 +71,6 @@ func (e Executor) runCommand(l *Listener) {
 			l.SendText(msg)
 		}
 
-		clientPool.Put(&client)
+		clientPool.Put(client)
 	}
 }
