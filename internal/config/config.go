@@ -36,9 +36,10 @@ type Command struct {
 // Arg represents argument config for a given command of a given client service.
 type Arg struct {
 	TypeInfo     `mapstructure:",squash"`
-	Index        int    `mapstructure:"index"`
-	Type         string `mapstructure:"type"`
-	CompressRest bool   `mapstructure:"compress_rest"`
+	Index        int           `mapstructure:"index"`
+	Type         string        `mapstructure:"type"`
+	CompressRest bool          `mapstructure:"compress_rest"`
+	Filter       []interface{} `mapstructure:"filter"`
 }
 
 // Response contains the configuration of the response signature of a given command.
