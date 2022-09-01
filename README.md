@@ -219,6 +219,8 @@ is done against the complete raw input, including the service/base command name.
   - To simply return the raw response, use "plain_text". 
 - **services[].response.success** When type is set to "json", the path to retrieve the response content when
   response status code is 200.
+- **services[].commands[].args[].filter** A filter list for accepted arg values. If not set. it is
+    assumed that all values are accepted for this arg.
 - **services[].response.error** When type is set to "json", the path to retrieve the response content when
   response status code is not 200.
 
