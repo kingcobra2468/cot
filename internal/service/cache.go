@@ -58,6 +58,7 @@ func (c *Cache) Services() []string {
 // newServicePool creates a new client pool for a given service.
 func newServicePool(s Service) *sync.Pool {
 	return &sync.Pool{New: func() interface{} {
-		return Service(s)
+		s := Service(s)
+		return &s
 	}}
 }

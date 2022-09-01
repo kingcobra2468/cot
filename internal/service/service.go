@@ -76,8 +76,10 @@ type Arg struct {
 	TypeInfo
 	Type ArgType
 	// Whether to compress the rest of the commands from the input command into an array
-	// under this argument.s
-	Compress bool
+	// under this argument.
+	Compress      bool
+	Filter        []interface{}
+	FilterEnabled bool
 }
 
 // TypeInfo describes the metadata about a given argument and response attribute.
@@ -223,7 +225,7 @@ func generateSubCommand(cmdInfo *config.Command) (*Command, error) {
 }
 
 // generateArgs parses and validates the arguments that were specified in the configuration
-// file of a given command. The arguments are then preprocessed abd aggregated into similar types.
+// file of a given command. The arguments are then preprocessed and aggregated into similar types.
 func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 	ag := make(ArgGroups)
 	ag[QueryArg] = make(ArgBindings)
@@ -232,6 +234,8 @@ func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 	argCompress := false
 
 	for _, arg := range *argInfo {
+		filterEnabled := false
+		var filter []interface{}
 		t, err := parseArgType(arg.Type)
 		if err != nil {
 			return nil, err
@@ -250,9 +254,14 @@ func generateArgs(argInfo *[]config.Arg, method string) (*ArgGroups, error) {
 			argCompress = true
 		}
 
+		if arg.Filter != nil {
+			filter = arg.Filter
+			filterEnabled = true
+		}
+
 		// adds a given argument to a given arg group and points it to the positional
 		// index of the input command
-		ag[t][arg.Index] = &Arg{Type: t, Compress: arg.CompressRest, TypeInfo: TypeInfo{DataType: dt, Path: arg.Path}}
+		ag[t][arg.Index] = &Arg{Type: t, Compress: arg.CompressRest, TypeInfo: TypeInfo{DataType: dt, Path: arg.Path}, Filter: filter, FilterEnabled: filterEnabled}
 	}
 
 	return &ag, nil
@@ -322,12 +331,27 @@ func (sc Commands) findSubCmd(c *UserInput) (*Command, error) {
 	return nil, errors.New("unable to find a valid subcommand from the input command")
 }
 
+//check will perform a lookup of a raw arg value against a filter list to see if it is
+// allowed.
+func (a Arg) check(ra string) error {
+	if !a.FilterEnabled {
+		return nil
+	}
+	for _, val := range a.Filter {
+		if val == ra {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid or blacklisted value \"%s\" for arg", ra)
+}
+
 // queryString aggregates all of the query arguments from the input command.
 func (sc Command) queryString(c *UserInput) (string, error) {
 	query := url.Values{}
 	argCount := len((*sc.Args)[QueryArg])
 	if argCount > len(c.Args) {
-		return "", errors.New("unable to parse input command due to invalid among of input args")
+		return "", errors.New("unable to parse input command due to invalid amount of input args")
 	}
 
 	if argCount == 0 {
@@ -335,9 +359,15 @@ func (sc Command) queryString(c *UserInput) (string, error) {
 	}
 
 	for idx, arg := range (*sc.Args)[QueryArg] {
+		if err := arg.check(c.Args[idx]); err != nil {
+			return "", err
+		}
 		query.Add(arg.Path, c.Args[idx])
 		if arg.Compress {
 			for i := idx + 1; i < len(c.Args)-1; i++ {
+				if err := arg.check(c.Args[i]); err != nil {
+					return "", err
+				}
 				query.Add(arg.Path, c.Args[i])
 			}
 		}
@@ -357,38 +387,44 @@ func (sc Command) jsonString(c *UserInput) (string, error) {
 		return "", nil
 	}
 
-	for idx, argInfo := range (*sc.Args)[JsonArg] {
-		var arg interface{}
+	for idx, arg := range (*sc.Args)[JsonArg] {
+		var val interface{}
 		var err error
+		if err := arg.check(c.Args[idx]); err != nil {
+			return "", err
+		}
 
-		if argInfo.Compress {
+		if arg.Compress {
 			for i := idx; i < len(c.Args); i++ {
-				json.ArrayAppendP(c.Args[i], argInfo.Path)
+				if err := arg.check(c.Args[i]); err != nil {
+					return "", err
+				}
+				json.ArrayAppendP(c.Args[i], arg.Path)
 			}
 			break
 		}
 
-		switch argInfo.DataType {
+		switch arg.DataType {
 		case StringType:
-			arg = c.Args[idx]
+			val = c.Args[idx]
 		case IntType:
-			arg, err = strconv.ParseInt(c.Args[idx], 10, 64)
+			val, err = strconv.ParseInt(c.Args[idx], 10, 64)
 			if err != nil {
 				return "", fmt.Errorf("unable to parse arg %s into an int", c.Args[idx])
 			}
 		case FloatType:
-			arg, err = strconv.ParseFloat(c.Args[idx], 64)
+			val, err = strconv.ParseFloat(c.Args[idx], 64)
 			if err != nil {
 				return "", fmt.Errorf("unable to parse arg %s into an float", c.Args[idx])
 			}
 		case BoolType:
-			arg, err = strconv.ParseBool(c.Args[idx])
+			val, err = strconv.ParseBool(c.Args[idx])
 			if err != nil {
 				return "", fmt.Errorf("unable to parse arg %s into an boolean", c.Args[idx])
 			}
 		}
 
-		json.SetP(arg, argInfo.Path)
+		json.SetP(val, arg.Path)
 	}
 
 	return json.String(), nil
@@ -406,7 +442,10 @@ func (sc Command) endpointString(c *UserInput) (string, error) {
 		return "", nil
 	}
 
-	for idx := range (*sc.Args)[EndpointArg] {
+	for idx, arg := range (*sc.Args)[EndpointArg] {
+		if err := arg.check(c.Args[idx]); err != nil {
+			return "", err
+		}
 		endpoint = append(endpoint, c.Args[idx])
 	}
 
