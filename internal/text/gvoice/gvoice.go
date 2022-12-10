@@ -67,7 +67,7 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 			RecipientPhoneNumber: &l.ClientNumber, NumMessages: &numMessages})
 	gvmsPool.Put(client)
 	if err != nil || !*msgList.Success {
-		return &texts, err
+		return &texts, errors.New(*msgList.Error)
 	}
 
 	// creates a Text instance for each raw message
