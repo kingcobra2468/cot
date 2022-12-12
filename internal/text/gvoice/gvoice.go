@@ -66,7 +66,11 @@ func (l Link) Texts(numMessages uint64) (*[]Text, error) {
 		&FetchContactHistoryRequest{GvoicePhoneNumber: &l.GVoiceNumber,
 			RecipientPhoneNumber: &l.ClientNumber, NumMessages: &numMessages})
 	gvmsPool.Put(client)
-	if err != nil || !*msgList.Success {
+
+	if err != nil {
+		return &texts, err
+	}
+	if !*msgList.Success {
 		return &texts, errors.New(*msgList.Error)
 	}
 
