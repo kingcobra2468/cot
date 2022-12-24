@@ -34,6 +34,12 @@ func (e Executor) Start(done <-chan struct{}) {
 // the commands to the appropriate service input stream.
 func (e Executor) runCommand(l *Listener) {
 	for _, command := range *l.Fetch() {
+		// check for "ping" requests
+		if strings.EqualFold(command.Name, "ping") {
+			l.SendText("pong")
+			continue
+		}
+
 		// check if the command request is authorized given the client number
 		// that initiated it
 		if !service.ClientAuthorized(command.Name, l.link.ClientNumber) {
