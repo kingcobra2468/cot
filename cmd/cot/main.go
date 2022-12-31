@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// init initialized the parsing of the config file and associated
+// init initializes the parsing of the config file and associated
 // environment variables.
 func init() {
 	viper.SetConfigName("cot_sm")
