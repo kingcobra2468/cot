@@ -14,19 +14,21 @@ import (
 
 // Listener listens to a given GVoice <-> Client conversation for new commands.
 type Listener struct {
-	link           gvoice.Link
-	latestTextTime uint64
-	encryption     bool
+	link            gvoice.Link
+	latestTextTime  uint64
+	encryption      bool
+	timestampOffset uint64
 }
 
 // minNumMessages is the minimum number of messages to fetch on the first iteration
 // when fetching the first conversation chunk.
 const minNumMessages uint64 = 5
+const pingOffset uint64 = 5
 
 // GenerateListeners creates a list of Listener instances from the configuration file. This
 // will also add each of the client numbers to the whitelist in the process.
 func GenerateListeners(c *config.Services) *[]*Listener {
-	listeners := []*Listener{NewListener(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false)}
+	listeners := []*Listener{NewListener(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, pingOffset)}
 	for _, s := range c.Services {
 		for _, cn := range s.ClientNumbers {
 			// check if listener for client number already exists
@@ -35,7 +37,7 @@ func GenerateListeners(c *config.Services) *[]*Listener {
 				continue
 			}
 			// creates a new client number listener
-			listeners = append(listeners, NewListener(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption))
+			listeners = append(listeners, NewListener(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, 0))
 			service.AddClient(s.Name, cn)
 			glog.Infof("created new listener for %s", cn)
 		}
@@ -45,13 +47,13 @@ func GenerateListeners(c *config.Services) *[]*Listener {
 }
 
 // NewListener initializes a new instance of a command listener.
-func NewListener(link gvoice.Link, encryption bool) *Listener {
+func NewListener(link gvoice.Link, encryption bool, timestampOffset uint64) *Listener {
 	// get the current time to prevent old commands (those which existed prior to start of cot)
 	// from being executed
 	currentTime := uint64(time.Now().Unix()) * 1000
 
 	return &Listener{link: link, encryption: encryption,
-		latestTextTime: currentTime}
+		latestTextTime: currentTime, timestampOffset: timestampOffset}
 }
 
 // Fetch retrieves the set of new commands that arrived since the last sync.
@@ -113,7 +115,7 @@ func (l *Listener) newTexts() (*[]gvoice.Text, error) {
 		}
 		// check if all possible texts have been retrieved
 		currentSize := len(*texts)
-		if prevSize == currentSize {
+		if prevSize == currentSize || (prevSize > 0 && (*texts)[len(*texts)-1].Timestamp < l.latestTextTime) {
 			break
 		}
 

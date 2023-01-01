@@ -39,14 +39,14 @@ func parseGVMS() (*config.GVMS, error) {
 
 // ping checks if COT is online.
 func ping(number string) error {
-	l := text.NewListener(gvoice.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false)
+	l := text.NewListener(gvoice.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false, 0)
 	if err := l.SendText("ping"); err != nil {
 		glog.Error(err)
 		return nil
 	}
-
-	time.Sleep(time.Second * 15)
-	for _, ui := range *l.Fetch() {
+	time.Sleep(time.Second * 20)
+	x := *l.Fetch()
+	for _, ui := range x {
 		if strings.EqualFold(ui.Name, "pong") {
 			return nil
 		}
