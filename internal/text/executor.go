@@ -36,7 +36,12 @@ func (e Executor) runCommand(l *Listener) {
 	for _, command := range *l.Fetch() {
 		// check for "ping" requests
 		if strings.EqualFold(command.Name, "ping") {
+			glog.Infoln("executed \"ping\" request")
 			l.SendText("pong")
+			continue
+		}
+		// ignore "pong" command relay
+		if strings.EqualFold(l.link.GVoiceNumber, l.link.ClientNumber) && strings.EqualFold(command.Name, "pong") {
 			continue
 		}
 
