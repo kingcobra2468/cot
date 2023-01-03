@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
@@ -63,6 +65,15 @@ func parseEncryption() (*config.Encryption, error) {
 }
 
 func main() {
+	done := make(chan struct{})
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func(done chan struct{}) {
+		<-sigs
+		glog.Infoln("handled signal")
+		done <- struct{}{}
+	}(done)
+
 	flag.Parse()
 
 	// read config
@@ -99,8 +110,6 @@ func main() {
 		crypto.LoadClientNumberKeys(encryption.ClientNumberPublicKeyDir)
 	}
 
-	done := make(chan struct{})
-
 	// create cache and register all services with it
 	services, err := service.GenerateServices(sc)
 	if err != nil {
@@ -116,6 +125,7 @@ func main() {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	commandExecutor.Start(done)
+	glog.Infof("started cot on pid:%d", os.Getppid())
+	commandExecutor.Start(done, &wg)
 	wg.Wait()
 }
