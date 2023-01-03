@@ -24,11 +24,12 @@ COPY . .
 RUN mkdir -p /cot/config /cot/cn_secrets /cot/secrets
 
 RUN go get -d -v ./...
-RUN go install -v ./...
-RUN go build
+RUN go install -v ./cmd/cot && go install -v ./cmd/healthcheck
 
 VOLUME /cot/config
 VOLUME /cot/cn_secrets
 VOLUME /cot/secrets
+
+HEALTHCHECK --interval=500s --timeout=40s --start-period=60s CMD healthcheck
 
 CMD ["cot", "-logtostderr=true"]

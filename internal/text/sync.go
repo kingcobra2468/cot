@@ -33,7 +33,7 @@ func (s *Sync) AddRecipient(recipient ...*Listener) {
 
 // Start begins the eventloop of listening for new commands given the set
 // of provided listeners.
-func (s *Sync) Start(wc workerCallback, done <-chan struct{}) *sync.WaitGroup {
+func (s *Sync) Start(wc workerCallback, done chan struct{}) *sync.WaitGroup {
 	workers := sync.WaitGroup{}
 	for i := 0; i < s.maxWorkers; i++ {
 		workers.Add(1)
@@ -42,6 +42,7 @@ func (s *Sync) Start(wc workerCallback, done <-chan struct{}) *sync.WaitGroup {
 				select {
 				case <-done:
 					workers.Done()
+					done <- struct{}{}
 					return
 				case l := <-s.queue:
 					wc(l)

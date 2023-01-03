@@ -4,6 +4,7 @@ package text
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/service"
@@ -25,9 +26,10 @@ func NewExecutor(maxReceivers, maxWorkers int, c *service.Cache) *Executor {
 
 // Start begins the event loop which syncs messages and executes them against
 // registered services.
-func (e Executor) Start(done <-chan struct{}) {
+func (e Executor) Start(done chan struct{}, wge *sync.WaitGroup) {
 	wg := e.Sync.Start(e.runCommand, done)
 	wg.Wait()
+	wge.Done()
 }
 
 // runCommand fetches new commands for a given listener and then propagates
@@ -36,7 +38,12 @@ func (e Executor) runCommand(l *Listener) {
 	for _, command := range *l.Fetch() {
 		// check for "ping" requests
 		if strings.EqualFold(command.Name, "ping") {
+			glog.Infoln("executed \"ping\" request")
 			l.SendText("pong")
+			continue
+		}
+		// ignore "pong" command relay
+		if strings.EqualFold(l.link.GVoiceNumber, l.link.ClientNumber) && strings.EqualFold(command.Name, "pong") {
 			continue
 		}
 
