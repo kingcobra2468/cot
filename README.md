@@ -1,7 +1,8 @@
 # **COT**
+
 Commands over text(COT) is platform for bridging internal services and mobile users
 over the SMS/MMS protocol. Through a rich and programmable interface, one is able to define
-and fine-tune commands designated to internal services without doing any port-forwarding. 
+and fine-tune commands designated to internal services without doing any port-forwarding.
 
 COT's main benefit arises with the ability to interact with internal services without
 the need to do any port forwarding or exposure to the public internet. Thus, with COT
@@ -10,6 +11,7 @@ client service wrappers which will accept requests from cot and then further pas
 on to the internal services.
 
 ## **Terminology**
+
 - **Client Number=** phone number that sends the command request.
 - **GVoice Number=** Gvoice phone number that services as receiver for commands that
   come from client numbers.
@@ -18,20 +20,24 @@ on to the internal services.
   responsible for taking in a command request, executing it, and returning the response.
 
 ## **Architecture**
+
 ![photo](images/cot.jpg)
 
 COT, being generic, enables one to create any command they want as long as one defines
 it within `cot_sm.yaml`. Within the config file, one would specify:
+
 1. The name of the service and a list of commands that hit various endpoints of such service.
 2. List of client numbers authorized to use the command.
 
 ## **Flow**
+
 The end-to-end flow of COT is as follows:
+
 1. COT initializes a worker that checks the (GVoice Number, Client Number)
    link periodically by polling GVMS. *By listening to only the subnet of defined client numbers,
    COT, by nature, will ignore all numbers that have not been whitelisted by any of the
    services within `cot_sm.yaml`.*
-2. A client sends a command in the format "[cmd] [arg 0] [arg 1] ... [arg N]" (split into tokens by 
+2. A client sends a command in the format "[cmd] [arg 0] [arg 1] ... [arg N]" (split into tokens by
    the space delimiter) to a GVoice number that COT polls.
 3. On detection of a new user command, COT parsers the command and checks if the client number is
    authorized to run this command. Non-authorized commands will be rejected. Likewise, COT also checks
@@ -39,11 +45,12 @@ The end-to-end flow of COT is as follows:
 4. COT tries to match the user command to a given command of a service by doing pattern checking against
    the input. In the case were no patterns match, an error is returned. Otherwise, the arguments are
    reformated into appropriate arg groups and the command is sent to the configured service + endpoint along
-   with the defined HTTP method. 
+   with the defined HTTP method.
 5. The output of the command would then parsed based on the response configuration and is then sent back
    to the client number.
 
 ## **Encryption**
+
 ![photo](images/cot_encryption.jpg)
 
 Given that the SMS/MMS protocol is the foundation for COT, all messages will be visible
@@ -56,23 +63,27 @@ limitations.
 ### **Flows**
 
 #### **No Encryption Flow**
+
 This is the least secure of all flows and should be used in the case where the 2 other flows are
 not viable.
 
 #### **PGP Encryption Flow**
+
 This flow requires the client number to sign the command request with COT's public key prior to
 sending the message. The ASCII armored message will then be sent to COT. COT will send the response
 encrypted with the client number's public key.
 
 #### **PGP Encryption Flow & Base64**
+
 This flow requires the client number to sign the command request with COT's public key prior to
 sending the message. Afterwards, the ASCII armored message would then need to be base64 encoded.
-In the response message, COT will do the same and base64 encode the ASCII armoured message. The 
+In the response message, COT will do the same and base64 encode the ASCII armoured message. The
 reason behind base64 encoding is due to some MMS/SMS clients on Android doing compression. Even
 though the compression might seem harmless, PGP requires certain schema and this will render the
 message useless. Thus, using base64 will preserve all the formatting in order to prevent corruption.
 
 ### **Note on PGP Signatures**
+
 For the *PGP Encryption* and *PGP Encryption & Base64* flows, the option to set
 `COT_SIG_VERIFICATION` is possible. This will validate that the input command is signed by
 the client number and will also sign the response with COT's private key. However, some SMS/MMS
@@ -82,16 +93,19 @@ thus this option should might not work everywhere. Thus, unless tested that it w
 from the PGP client app used on the client number phone, in order to avoid large message sizes.
 
 ### **Note on PGP and Base64 Encoding From Client Side**
+
 Since there is no user client for COT as it is intended to use the default SMS/MMS client, one
 would have to download a PGP encoding/decoding as well as a base64 encoding/decoding app from the
 App Store/Play Store and do the steps themselves each time.
 
 #### **PGP Encryption Flow**
+
 1. Encrypt command with PGP app.
 2. Send output to COT via SMS/MMS client.
 3. After response arrives from COT, paste it into PGP app's decoder and see command output.
 
 #### **PGP Encryption & Base64 Flow**
+
 1. Encrypt command with PGP app.
 2. Paste encrypted message into encoder of Base64 app.
 3. Send output to COT via SMS/MMS client.
@@ -101,14 +115,17 @@ App Store/Play Store and do the steps themselves each time.
 ## **Configuration**
 
 ### **General Configuration**
-Most configuration is done via the `cot_sm.yaml` file which needs to be copied/renamed from 
+
+Most configuration is done via the `cot_sm.yaml` file which needs to be copied/renamed from
 `cot_sm_template.yaml`. By default, the file needs to be located in the same directory as
 the executable or `main.go`, unless an alternate path is specified via the `COT_CONF_DIR`
 environment variable.
 
 #### **Sample Configuration**
+
 The best way to explain the configuration achievable with COT is through an example `cot_sm.yaml`
-file. Note that none of the data is real and the numbers are fake and should not be contacted. 
+file. Note that none of the data is real and the numbers are fake and should not be contacted.
+
 ```yaml
 ---
 gvms:
@@ -157,9 +174,10 @@ services:
             datatype: str
             path: data
 ```
+
 The configuration above defines a single service. To send a command, a client number must
 send a text to `11111111111` which COT polls from GVMS. Here, GVMS runs on `192.168.1.10`
-with port `7777`. The single service, is represented by the command `car`. 
+with port `7777`. The single service, is represented by the command `car`.
 
 The command `car` exposes two subcommands, one of which gets triggered when the user command
 contains `changeprice` while the other gets triggered when the user command contains `remove`.
@@ -175,12 +193,15 @@ will be converted into a DELETE request with the URL being `http://192.168.1.11:
 then return the contents of `data` key from the response JSON payload.
 
 #### **Reference**
+
 The reference contains all of possible fields within `cot_sm.yaml`. The fields are represented by their path
 from the root of the config file. So, for example `gvms.hostname` will represent:
+
 ```yaml
 gvms:
   hostname:
 ```
+
 It is also important to know how COT does user command input parsing. COT parses the raw user input string into
 tokens that are split by space character. The first token corresponds to the service/base command name. The
 rest of the tokens correspond to args and are 0 indexed. When doing pattern patching of the command, the matching
@@ -208,15 +229,15 @@ is done against the complete raw input, including the service/base command name.
   - For JSON args, use "json".
   - For endpoint args, use "endpoint".
 - **services[].commands[].args[].index** The mapping between a raw arg and the current
-  translation. 
+  translation.
 - **services[].commands[].args[].path** The JSON/query path to where place/get the arg. For endpoint args, this value
   is ignored and can be removed.
 - **services[].commands[].args[].compress_rest** Whether to compress the rest of the input args from the current index
-  into an array of the given arg type. 
+  into an array of the given arg type.
 - **services[].commands[].response.type** The response content type. Supported types are:
   - For JSON response content type, which will enable for further response parsing for success and error cases
     use "json".
-  - To simply return the raw response, use "plain_text". 
+  - To simply return the raw response, use "plain_text".
 - **services[].response.success** When type is set to "json", the path to retrieve the response content when
   response status code is 200.
 - **services[].commands[].args[].filter** A filter list for accepted arg values. If not set. it is
@@ -225,8 +246,10 @@ is done against the complete raw input, including the service/base command name.
   response status code is not 200.
 
 ### **Encryption Configuration**
+
 The follow environment variables can be defined in the case were encryption is enabled. If
 encryption is not enabled, then none of these environment variables need to be set.
+
 - **COT_TEXT_ENCRYPTION=** whether encryption is enabled (true, false)
 - **COT_PUBLIC_KEY_FILE=** path to COT's public PGP key
 - **COT_PRIVATE_KEY_FILE=** path to COT's private PGP key
@@ -236,6 +259,7 @@ encryption is not enabled, then none of these environment variables need to be s
 - **COT_BASE64_ENCODING=** whether messages will be base64 encoded
 
 ## **Installation**
+
 - Setup GVMS as explained [here](https://github.com/kingcobra2468/GVMS).
 - Clone COT and setup [configuration](#configuration).
 - Install dependencies with `go get`.
