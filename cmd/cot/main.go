@@ -9,10 +9,10 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
+	"github.com/kingcobra2468/cot/internal/router"
+	"github.com/kingcobra2468/cot/internal/router/crypto"
+	"github.com/kingcobra2468/cot/internal/router/gvoice"
 	"github.com/kingcobra2468/cot/internal/service"
-	"github.com/kingcobra2468/cot/internal/text"
-	"github.com/kingcobra2468/cot/internal/text/crypto"
-	"github.com/kingcobra2468/cot/internal/text/gvoice"
 	"github.com/spf13/viper"
 )
 
@@ -119,9 +119,12 @@ func main() {
 	serviceCache := service.NewCache()
 	serviceCache.Add(services...)
 
-	listeners := text.GenerateListeners(sc)
-	commandExecutor := text.NewExecutor(5, len(*listeners), serviceCache)
-	commandExecutor.AddRecipient((*listeners)...)
+	textWorkers := router.GenerateTextWorkers(sc)
+	commandExecutor := router.NewEventLoop(5, len(*textWorkers), serviceCache)
+
+	for _, w := range *textWorkers {
+		commandExecutor.AddWorker(w)
+	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
-	"github.com/kingcobra2468/cot/internal/text"
-	"github.com/kingcobra2468/cot/internal/text/gvoice"
+	"github.com/kingcobra2468/cot/internal/router"
+	"github.com/kingcobra2468/cot/internal/router/gvoice"
 	"github.com/spf13/viper"
 )
 
@@ -39,8 +39,8 @@ func parseGVMS() (*config.GVMS, error) {
 
 // ping checks if COT is online.
 func ping(number string) error {
-	l := text.NewListener(gvoice.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false, 0)
-	if err := l.SendText("ping"); err != nil {
+	l := router.NewTextWorker(gvoice.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false, 0)
+	if err := l.Send("ping"); err != nil {
 		glog.Error(err)
 		return nil
 	}
