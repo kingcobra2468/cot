@@ -11,7 +11,7 @@ import (
 	"github.com/kingcobra2468/cot/internal/service"
 )
 
-// EventLoop handles new command requests recieved by workers.
+// EventLoop handles new command requests received by workers.
 type EventLoop struct {
 	// listener worker pool queue for polling listeners for new commands
 	queue      chan Worker
@@ -45,11 +45,11 @@ func (el *EventLoop) loop(done chan struct{}) *sync.WaitGroup {
 					workers.Done()
 					done <- struct{}{}
 					return
-				case l := <-el.queue:
-					el.process(l)
+				case w := <-el.queue:
+					el.process(w)
 					go func() {
 						time.Sleep(time.Duration(time.Second * 10))
-						el.queue <- l
+						el.queue <- w
 					}()
 				}
 			}
@@ -92,7 +92,7 @@ func (el *EventLoop) process(w Worker) {
 			w.Send("internal error, try later")
 			continue
 		}
-		glog.Infof("executed e\"%s\" with args \"%v\"", command.Name, command.Args)
+		glog.Infof("executed \"%s\" with args \"%v\"", command.Name, command.Args)
 		msg, err := client.Execute(&command)
 		if err != nil {
 			msg = err.Error()
