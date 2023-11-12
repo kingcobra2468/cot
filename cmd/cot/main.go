@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
@@ -120,7 +121,7 @@ func main() {
 	serviceCache.Add(services...)
 
 	textWorkers := router.GenerateTextWorkers(sc)
-	commandExecutor := router.NewEventLoop(5, len(*textWorkers), serviceCache)
+	commandExecutor := router.NewEventLoop(5, len(*textWorkers), time.Second*10, serviceCache)
 
 	for _, w := range *textWorkers {
 		commandExecutor.AddWorker(w)

@@ -17,13 +17,14 @@ type EventLoop struct {
 	queue      chan Worker
 	maxWorkers int
 	cache      *service.Cache
+	coolDown   time.Duration
 }
 
 // NewEventLoop creates a new instance of EventLoop.
-func NewEventLoop(maxReceivers, maxWorkers int, cache *service.Cache) *EventLoop {
+func NewEventLoop(maxReceivers, maxWorkers int, coolDown time.Duration, cache *service.Cache) *EventLoop {
 	queue := make(chan Worker, maxReceivers)
 
-	return &EventLoop{queue: queue, maxWorkers: maxWorkers, cache: cache}
+	return &EventLoop{queue: queue, maxWorkers: maxWorkers, coolDown: coolDown, cache: cache}
 }
 
 // AddWorker adds a new worker to the worker pool.
@@ -48,7 +49,7 @@ func (el *EventLoop) loop(done chan struct{}) *sync.WaitGroup {
 				case w := <-el.queue:
 					el.process(w)
 					go func() {
-						time.Sleep(time.Duration(time.Second * 10))
+						time.Sleep(el.coolDown)
 						el.queue <- w
 					}()
 				}
