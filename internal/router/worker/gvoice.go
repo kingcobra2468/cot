@@ -1,4 +1,4 @@
-package router
+package worker
 
 import (
 	"math"
@@ -7,22 +7,14 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
-	"github.com/kingcobra2468/cot/internal/router/crypto"
-	"github.com/kingcobra2468/cot/internal/router/gvoice"
-	"github.com/kingcobra2468/cot/internal/router/parser"
+	"github.com/kingcobra2468/cot/internal/router/worker/crypto"
+	"github.com/kingcobra2468/cot/internal/router/worker/gvoice"
+	"github.com/kingcobra2468/cot/internal/router/worker/parser"
 	"github.com/kingcobra2468/cot/internal/service"
 )
 
-// Worker receives/responds to commands for a source.
-type Worker interface {
-	Fetch() *[]service.UserInput
-	Send(message string) error
-	LoopBack() bool
-	Recipient() string
-}
-
-// TextWorker is a Worker for GVoice.
-type TextWorker struct {
+// GVoiceWorker is a Worker for GVoice.
+type GVoiceWorker struct {
 	link            gvoice.Link
 	latestTextTime  uint64
 	encryption      bool
@@ -34,10 +26,10 @@ type TextWorker struct {
 const minNumMessages uint64 = 5
 const pingOffset uint64 = 5
 
-// GenerateTextWorkers creates a list of Worker instances from the configuration file. This
+// GenerateGVoiceWorkers creates a list of Worker instances from the configuration file. This
 // will also add each of the client numbers to the whitelist in the process.
-func GenerateTextWorkers(c *config.Services) *[]*TextWorker {
-	listeners := []*TextWorker{NewTextWorker(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, pingOffset)}
+func GenerateGVoiceWorkers(c *config.Services) *[]*GVoiceWorker {
+	listeners := []*GVoiceWorker{NewGVoiceWorker(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, pingOffset)}
 	for _, s := range c.Services {
 		for _, cn := range s.ClientNumbers {
 			// check if listener for client number already exists
@@ -46,7 +38,7 @@ func GenerateTextWorkers(c *config.Services) *[]*TextWorker {
 				continue
 			}
 			// creates a new client number listener
-			listeners = append(listeners, NewTextWorker(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, 0))
+			listeners = append(listeners, NewGVoiceWorker(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, 0))
 			service.AddClient(s.Name, cn)
 			glog.Infof("created new listener for %s", cn)
 		}
@@ -55,18 +47,18 @@ func GenerateTextWorkers(c *config.Services) *[]*TextWorker {
 	return &listeners
 }
 
-// NewTextWorker creates a new instance of GVoice source worker.
-func NewTextWorker(link gvoice.Link, encryption bool, timestampOffset uint64) *TextWorker {
+// NewGVoiceWorker creates a new instance of GVoice source worker.
+func NewGVoiceWorker(link gvoice.Link, encryption bool, timestampOffset uint64) *GVoiceWorker {
 	// get the current time to prevent old commands (those which existed prior to start of cot)
 	// from being executed
 	currentTime := uint64(time.Now().Unix()) * 1000
 
-	return &TextWorker{link: link, encryption: encryption,
+	return &GVoiceWorker{link: link, encryption: encryption,
 		latestTextTime: currentTime, timestampOffset: timestampOffset}
 }
 
 // Fetch retrieves the set of new commands since the last sync.
-func (l *TextWorker) Fetch() *[]service.UserInput {
+func (l *GVoiceWorker) Fetch() *[]service.UserInput {
 	commands := []service.UserInput{}
 	texts, err := l.newTexts()
 	if err != nil || len(*texts) == 0 {
@@ -96,7 +88,7 @@ func (l *TextWorker) Fetch() *[]service.UserInput {
 }
 
 // newTexts fetches all of the new text messages since the last sync.
-func (l *TextWorker) newTexts() (*[]gvoice.Text, error) {
+func (l *GVoiceWorker) newTexts() (*[]gvoice.Text, error) {
 	var texts *[]gvoice.Text
 	var err error
 	// Discovers the set of new texts with the possibility of containing already
@@ -145,7 +137,7 @@ func oldestNewText(texts *[]gvoice.Text, timestamp uint64) (int, bool) {
 }
 
 // Send sends a text message to the recipient.
-func (l *TextWorker) Send(message string) error {
+func (l *GVoiceWorker) Send(message string) error {
 	msg := l.encode(message)
 	// perform encryption of message if enabled
 	if l.encryption {
@@ -160,7 +152,7 @@ func (l *TextWorker) Send(message string) error {
 }
 
 // encode encodes a string for GVoice.
-func (l *TextWorker) encode(message string) string {
+func (l *GVoiceWorker) encode(message string) string {
 	// undo any existing encoding on quotes
 	message = strings.ReplaceAll(message, "\\\"", "\"")
 	// encode all quotes
@@ -171,10 +163,10 @@ func (l *TextWorker) encode(message string) string {
 	return message
 }
 
-func (l *TextWorker) LoopBack() bool {
+func (l *GVoiceWorker) LoopBack() bool {
 	return strings.EqualFold(l.link.GVoiceNumber, l.link.ClientNumber)
 }
 
-func (l *TextWorker) Recipient() string {
+func (l *GVoiceWorker) Recipient() string {
 	return l.link.ClientNumber
 }

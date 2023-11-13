@@ -11,8 +11,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
 	"github.com/kingcobra2468/cot/internal/router"
-	"github.com/kingcobra2468/cot/internal/router/crypto"
-	"github.com/kingcobra2468/cot/internal/router/gvoice"
+	"github.com/kingcobra2468/cot/internal/router/worker"
+	"github.com/kingcobra2468/cot/internal/router/worker/crypto"
+	"github.com/kingcobra2468/cot/internal/router/worker/gvoice"
 	"github.com/kingcobra2468/cot/internal/service"
 	"github.com/spf13/viper"
 )
@@ -120,7 +121,7 @@ func main() {
 	serviceCache := service.NewCache()
 	serviceCache.Add(services...)
 
-	textWorkers := router.GenerateTextWorkers(sc)
+	textWorkers := worker.GenerateGVoiceWorkers(sc)
 	commandExecutor := router.NewEventLoop(5, len(*textWorkers), time.Second*10, serviceCache)
 
 	for _, w := range *textWorkers {

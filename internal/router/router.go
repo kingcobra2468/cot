@@ -11,6 +11,14 @@ import (
 	"github.com/kingcobra2468/cot/internal/service"
 )
 
+// Worker receives/responds to commands for a source.
+type Worker interface {
+	Fetch() *[]service.UserInput
+	Send(message string) error
+	LoopBack() bool
+	Recipient() string
+}
+
 // EventLoop handles new command requests received by workers.
 type EventLoop struct {
 	// listener worker pool queue for polling listeners for new commands
