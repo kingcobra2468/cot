@@ -95,7 +95,7 @@ func main() {
 		glog.Fatalln(err)
 	}
 	// register gvms connection config with gvms client
-	gvoice.Setup(gvms)
+	gvc := gvoice.New(gvms)
 
 	// read in gvms config and check integrity
 	encryption, err := parseEncryption()
@@ -121,7 +121,7 @@ func main() {
 	serviceCache := service.NewCache()
 	serviceCache.Add(services...)
 
-	textWorkers := worker.GenerateGVoiceWorkers(sc)
+	textWorkers := worker.GenerateGVoiceWorkers(sc, gvc)
 	commandExecutor := router.NewEventLoop(5, len(*textWorkers), time.Second*10, serviceCache)
 
 	for _, w := range *textWorkers {

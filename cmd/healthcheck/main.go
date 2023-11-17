@@ -38,8 +38,8 @@ func parseGVMS() (*config.GVMS, error) {
 }
 
 // ping checks if COT is online.
-func ping(number string) error {
-	l := worker.NewGVoiceWorker(gvoice.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false, 0)
+func ping(number string, gvc gvoice.GVoiceClient) error {
+	l := worker.NewGVoiceWorker(worker.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false, gvc)
 	if err := l.Send("ping"); err != nil {
 		glog.Error(err)
 		return nil
@@ -70,7 +70,7 @@ func main() {
 		glog.Error(err)
 	}
 	// register gvms connection config with gvms client
-	gvoice.Setup(gvms)
+	gvc := gvoice.New(gvms)
 
 	gvoiceNumber := viper.GetString("gvoice_number")
 	if len(gvoiceNumber) == 0 {
@@ -79,7 +79,7 @@ func main() {
 
 	glog.Infof("send \"ping\" to %s", gvoiceNumber)
 
-	if err := ping(gvoiceNumber); err != nil {
+	if err := ping(gvoiceNumber, gvc); err != nil {
 		os.Exit(1)
 	}
 }

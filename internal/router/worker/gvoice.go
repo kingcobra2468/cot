@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"context"
+	"errors"
 	"math"
 	"strings"
 	"time"
@@ -13,12 +15,26 @@ import (
 	"github.com/kingcobra2468/cot/internal/service"
 )
 
+// Link binds a given GVoice number with a client number for
+// fetching future commands.
+type Link struct {
+	GVoiceNumber string
+	ClientNumber string
+}
+
+// Text contains the message and the unix-time timestamp on when
+// it was received.
+type Text struct {
+	Message   string
+	Timestamp uint64
+}
+
 // GVoiceWorker is a Worker for GVoice.
 type GVoiceWorker struct {
-	link            gvoice.Link
-	latestTextTime  uint64
-	encryption      bool
-	timestampOffset uint64
+	link           Link
+	latestTextTime uint64
+	encryption     bool
+	gvmsClient     gvoice.GVoiceClient
 }
 
 // minNumMessages is the minimum number of messages to fetch on the first iteration
@@ -28,8 +44,8 @@ const pingOffset uint64 = 5
 
 // GenerateGVoiceWorkers creates a list of Worker instances from the configuration file. This
 // will also add each of the client numbers to the whitelist in the process.
-func GenerateGVoiceWorkers(c *config.Services) *[]*GVoiceWorker {
-	listeners := []*GVoiceWorker{NewGVoiceWorker(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, pingOffset)}
+func GenerateGVoiceWorkers(c *config.Services, gvc gvoice.GVoiceClient) *[]*GVoiceWorker {
+	listeners := []*GVoiceWorker{NewGVoiceWorker(Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, gvc)}
 	for _, s := range c.Services {
 		for _, cn := range s.ClientNumbers {
 			// check if listener for client number already exists
@@ -38,7 +54,7 @@ func GenerateGVoiceWorkers(c *config.Services) *[]*GVoiceWorker {
 				continue
 			}
 			// creates a new client number listener
-			listeners = append(listeners, NewGVoiceWorker(gvoice.Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, 0))
+			listeners = append(listeners, NewGVoiceWorker(Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, gvc))
 			service.AddClient(s.Name, cn)
 			glog.Infof("created new listener for %s", cn)
 		}
@@ -48,19 +64,19 @@ func GenerateGVoiceWorkers(c *config.Services) *[]*GVoiceWorker {
 }
 
 // NewGVoiceWorker creates a new instance of GVoice source worker.
-func NewGVoiceWorker(link gvoice.Link, encryption bool, timestampOffset uint64) *GVoiceWorker {
+func NewGVoiceWorker(link Link, encryption bool, c gvoice.GVoiceClient) *GVoiceWorker {
 	// get the current time to prevent old commands (those which existed prior to start of cot)
 	// from being executed
 	currentTime := uint64(time.Now().Unix()) * 1000
 
 	return &GVoiceWorker{link: link, encryption: encryption,
-		latestTextTime: currentTime, timestampOffset: timestampOffset}
+		latestTextTime: currentTime, gvmsClient: c}
 }
 
 // Fetch retrieves the set of new commands since the last sync.
 func (l *GVoiceWorker) Fetch() *[]service.UserInput {
 	commands := []service.UserInput{}
-	texts, err := l.newTexts()
+	texts, err := l.unprocessedTexts()
 	if err != nil || len(*texts) == 0 {
 		return &commands
 	}
@@ -87,15 +103,15 @@ func (l *GVoiceWorker) Fetch() *[]service.UserInput {
 	return &commands
 }
 
-// newTexts fetches all of the new text messages since the last sync.
-func (l *GVoiceWorker) newTexts() (*[]gvoice.Text, error) {
-	var texts *[]gvoice.Text
+// unprocessedTexts fetches all of the new text messages since the last sync.
+func (l *GVoiceWorker) unprocessedTexts() (*[]Text, error) {
+	var texts *[]Text
 	var err error
 	// Discovers the set of new texts with the possibility of containing already
 	// visited texts. This is done to reduce calls to gvoice and overall api calls.
 	for prevSize, multiplier := 0, 1; ; {
 		// increase number of messages to search for by following the sequence 2^n
-		texts, err = l.link.Texts((uint64(prevSize) * uint64(math.Pow(2, float64(multiplier)))) + minNumMessages)
+		texts, err = l.newTexts((uint64(prevSize) * uint64(math.Pow(2, float64(multiplier)))) + minNumMessages)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +128,7 @@ func (l *GVoiceWorker) newTexts() (*[]gvoice.Text, error) {
 	// to prune the already executed messages from the list of messages
 	oldestIndex, ok := oldestNewText(texts, l.latestTextTime)
 	if !ok {
-		return &[]gvoice.Text{}, nil
+		return &[]Text{}, nil
 	}
 	// remove all previously executed commands
 	prunedTexts := (*texts)[:oldestIndex+1]
@@ -120,9 +136,36 @@ func (l *GVoiceWorker) newTexts() (*[]gvoice.Text, error) {
 	return &prunedTexts, nil
 }
 
+// Texts fetches the number of messages specified from the message history between
+// a client number and an associated gvoice number.
+func (l *GVoiceWorker) newTexts(numMessages uint64) (*[]Text, error) {
+	texts := []Text{}
+	// extract a list of messages which contain at most numMessages messages
+	msgList, err := l.gvmsClient.GetContactHistory(context.Background(),
+		&gvoice.FetchContactHistoryRequest{GvoicePhoneNumber: &l.link.GVoiceNumber,
+			RecipientPhoneNumber: &l.link.ClientNumber, NumMessages: &numMessages})
+
+	if err != nil {
+		return &texts, err
+	}
+	if !*msgList.Success {
+		return &texts, errors.New(*msgList.Error)
+	}
+
+	// creates a Text instance for each raw message
+	for _, text := range msgList.Messages {
+		if !*text.Source {
+			continue
+		}
+		texts = append(texts, Text{Message: *text.MessageContents, Timestamp: uint64(*text.Timestamp)})
+	}
+
+	return &texts, nil
+}
+
 // oldestNewText finds the index of the "oldest" unvisited command. Commands arrive in
 // newest to oldest order by nature of GVoice API.
-func oldestNewText(texts *[]gvoice.Text, timestamp uint64) (int, bool) {
+func oldestNewText(texts *[]Text, timestamp uint64) (int, bool) {
 	oldestIndex := len(*texts) - 1
 	newTextFound := false
 	for i := range *texts {
@@ -148,7 +191,17 @@ func (l *GVoiceWorker) Send(message string) error {
 		}
 	}
 
-	return l.link.SendText(msg)
+	req := &gvoice.SendSMSRequest{GvoicePhoneNumber: &l.link.GVoiceNumber, RecipientPhoneNumber: &l.link.ClientNumber, Message: &msg}
+	resp, err := l.gvmsClient.SendSMS(context.Background(), req)
+
+	if err != nil {
+		return err
+	}
+	if resp.Error != nil {
+		return errors.New(*resp.Error)
+	}
+
+	return nil
 }
 
 // encode encodes a string for GVoice.
