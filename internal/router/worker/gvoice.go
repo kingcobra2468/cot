@@ -44,22 +44,22 @@ const minNumMessages uint64 = 5
 // GenerateGVoiceWorkers creates a list of Worker instances from the configuration file. This
 // will also add each of the client numbers to the whitelist in the process.
 func GenerateGVoiceWorkers(c *config.Services, gvc gvoice.GVoiceClient) *[]*GVoiceWorker {
-	listeners := []*GVoiceWorker{NewGVoiceWorker(Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, gvc)}
+	workers := []*GVoiceWorker{NewGVoiceWorker(Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: c.GVoiceNumber}, false, gvc)}
 	for _, s := range c.Services {
 		for _, cn := range s.ClientNumbers {
-			// check if listener for client number already exists
+			// check if worker exists (to avoid duplicate workers)
 			if service.ClientExists(cn) {
 				service.AddClient(s.Name, cn)
 				continue
 			}
-			// creates a new client number listener
-			listeners = append(listeners, NewGVoiceWorker(Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, gvc))
+
+			workers = append(workers, NewGVoiceWorker(Link{GVoiceNumber: c.GVoiceNumber, ClientNumber: cn}, c.TextEncryption, gvc))
 			service.AddClient(s.Name, cn)
-			glog.Infof("created new listener for %s", cn)
+			glog.Infof("created new gvoice worker for %s", cn)
 		}
 	}
 
-	return &listeners
+	return &workers
 }
 
 // NewGVoiceWorker creates a new instance of GVoice source worker.
@@ -73,9 +73,9 @@ func NewGVoiceWorker(link Link, encryption bool, c gvoice.GVoiceClient) *GVoiceW
 }
 
 // Fetch retrieves the set of new commands since the last sync.
-func (l *GVoiceWorker) Fetch() *[]service.UserInput {
+func (gw *GVoiceWorker) Fetch() *[]service.UserInput {
 	commands := []service.UserInput{}
-	texts, err := l.unprocessedTexts()
+	texts, err := gw.unprocessedTexts()
 	if err != nil || len(*texts) == 0 {
 		return &commands
 	}
@@ -84,8 +84,8 @@ func (l *GVoiceWorker) Fetch() *[]service.UserInput {
 	for _, text := range *texts {
 		msg := text.Message
 		// perform decryption of message if enabled
-		if l.encryption {
-			msg, err = crypto.Decrypt(l.link.ClientNumber, msg)
+		if gw.encryption {
+			msg, err = crypto.Decrypt(gw.link.ClientNumber, msg)
 			if err != nil {
 				glog.Errorln(err)
 				continue
@@ -97,26 +97,26 @@ func (l *GVoiceWorker) Fetch() *[]service.UserInput {
 		}
 	}
 	// update the timestamp to that of the last recorded command
-	l.latestTextTime = (*texts)[len(*texts)-1].Timestamp
+	gw.latestTextTime = (*texts)[len(*texts)-1].Timestamp
 
 	return &commands
 }
 
 // unprocessedTexts fetches all of the new text messages since the last sync.
-func (l *GVoiceWorker) unprocessedTexts() (*[]Text, error) {
+func (gw *GVoiceWorker) unprocessedTexts() (*[]Text, error) {
 	var texts *[]Text
 	var err error
 	// Discovers the set of new texts with the possibility of containing already
 	// visited texts. This is done to reduce calls to gvoice and overall api calls.
 	for prevSize, multiplier := 0, 1; ; {
 		// increase number of messages to search for by following the sequence 2^n
-		texts, err = l.newTexts((uint64(prevSize) * uint64(math.Pow(2, float64(multiplier)))) + minNumMessages)
+		texts, err = gw.newTexts((uint64(prevSize) * uint64(math.Pow(2, float64(multiplier)))) + minNumMessages)
 		if err != nil {
 			return nil, err
 		}
 		// check if all possible texts have been retrieved
 		currentSize := len(*texts)
-		if prevSize == currentSize || (prevSize > 0 && (*texts)[len(*texts)-1].Timestamp < l.latestTextTime) {
+		if prevSize == currentSize || (prevSize > 0 && (*texts)[len(*texts)-1].Timestamp < gw.latestTextTime) {
 			break
 		}
 
@@ -125,7 +125,7 @@ func (l *GVoiceWorker) unprocessedTexts() (*[]Text, error) {
 
 	// fetch the index of "oldest" newest (message that is yet to be executed) in order
 	// to prune the already executed messages from the list of messages
-	oldestIndex, ok := oldestNewText(texts, l.latestTextTime)
+	oldestIndex, ok := oldestNewText(texts, gw.latestTextTime)
 	if !ok {
 		return &[]Text{}, nil
 	}
@@ -137,12 +137,12 @@ func (l *GVoiceWorker) unprocessedTexts() (*[]Text, error) {
 
 // Texts fetches the number of messages specified from the message history between
 // a client number and an associated gvoice number.
-func (l *GVoiceWorker) newTexts(numMessages uint64) (*[]Text, error) {
+func (gw *GVoiceWorker) newTexts(numMessages uint64) (*[]Text, error) {
 	texts := []Text{}
 	// extract a list of messages which contain at most numMessages messages
-	msgList, err := l.gvmsClient.GetContactHistory(context.Background(),
-		&gvoice.FetchContactHistoryRequest{GvoicePhoneNumber: &l.link.GVoiceNumber,
-			RecipientPhoneNumber: &l.link.ClientNumber, NumMessages: &numMessages})
+	msgList, err := gw.gvmsClient.GetContactHistory(context.Background(),
+		&gvoice.FetchContactHistoryRequest{GvoicePhoneNumber: &gw.link.GVoiceNumber,
+			RecipientPhoneNumber: &gw.link.ClientNumber, NumMessages: &numMessages})
 
 	if err != nil {
 		return &texts, err
@@ -179,18 +179,18 @@ func oldestNewText(texts *[]Text, timestamp uint64) (int, bool) {
 }
 
 // Send sends a text message to the recipient.
-func (l *GVoiceWorker) Send(message string) error {
-	msg := l.encode(message)
-	if l.encryption {
+func (gw *GVoiceWorker) Send(message string) error {
+	msg := encode(message)
+	if gw.encryption {
 		var err error
-		msg, err = crypto.Encrypt(l.link.ClientNumber, msg)
+		msg, err = crypto.Encrypt(gw.link.ClientNumber, msg)
 		if err != nil {
 			glog.Errorln(err)
 		}
 	}
 
-	req := &gvoice.SendSMSRequest{GvoicePhoneNumber: &l.link.GVoiceNumber, RecipientPhoneNumber: &l.link.ClientNumber, Message: &msg}
-	resp, err := l.gvmsClient.SendSMS(context.Background(), req)
+	req := &gvoice.SendSMSRequest{GvoicePhoneNumber: &gw.link.GVoiceNumber, RecipientPhoneNumber: &gw.link.ClientNumber, Message: &msg}
+	resp, err := gw.gvmsClient.SendSMS(context.Background(), req)
 
 	if err != nil {
 		return err
@@ -203,7 +203,7 @@ func (l *GVoiceWorker) Send(message string) error {
 }
 
 // encode encodes a string for GVoice.
-func (l *GVoiceWorker) encode(message string) string {
+func encode(message string) string {
 	// undo any existing encoding on quotes
 	message = strings.ReplaceAll(message, "\\\"", "\"")
 	// encode all quotes
@@ -214,10 +214,10 @@ func (l *GVoiceWorker) encode(message string) string {
 	return message
 }
 
-func (l *GVoiceWorker) LoopBack() bool {
-	return strings.EqualFold(l.link.GVoiceNumber, l.link.ClientNumber)
+func (gw *GVoiceWorker) LoopBack() bool {
+	return strings.EqualFold(gw.link.GVoiceNumber, gw.link.ClientNumber)
 }
 
-func (l *GVoiceWorker) Recipient() string {
-	return l.link.ClientNumber
+func (gw *GVoiceWorker) Recipient() string {
+	return gw.link.ClientNumber
 }

@@ -21,7 +21,7 @@ type Worker interface {
 
 // EventLoop handles new command requests received by workers.
 type EventLoop struct {
-	// listener worker pool queue for polling listeners for new commands
+	// worker pool queue for polling workers for new commands
 	queue      chan Worker
 	maxWorkers int
 	cache      *service.Cache
@@ -40,6 +40,14 @@ func (el *EventLoop) AddWorker(worker ...Worker) {
 	for _, w := range worker {
 		el.queue <- w
 	}
+}
+
+// Start begins the event loop.
+func (el *EventLoop) Start(done chan struct{}, wge *sync.WaitGroup) {
+	wg := el.loop(done)
+
+	wg.Wait()
+	wge.Done()
 }
 
 // loop starts the event loop process.
@@ -111,12 +119,4 @@ func (el *EventLoop) process(w Worker) {
 
 		clientPool.Put(client)
 	}
-}
-
-// Start begins the event loop.
-func (el *EventLoop) Start(done chan struct{}, wge *sync.WaitGroup) {
-	wg := el.loop(done)
-
-	wg.Wait()
-	wge.Done()
 }

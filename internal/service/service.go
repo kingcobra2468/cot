@@ -37,20 +37,20 @@ type MethodSet map[string]struct{}
 // given arg type.
 type ArgGroups map[ArgType]ArgBindings
 
-// Service handles the communication between a command request and the associated
-// client service.
-type Service struct {
-	Commands
-	Name    string
-	BaseURI string
-}
-
 // UserInput sets up the schema for a command request via the name of a command and its
 // its arguments.
 type UserInput struct {
 	Name string
 	Args []string
 	Raw  string
+}
+
+// Service handles the communication between a command request and the associated
+// client service.
+type Service struct {
+	Commands
+	Name    string
+	BaseURI string
 }
 
 // Commands represents the global schematics of all commands for a given client service.
@@ -319,6 +319,34 @@ func methodExists(method string) bool {
 	return isValid
 }
 
+// Execute will push the command request to the associated client service and will
+// retrieve the output.
+func (s Service) Execute(ui *UserInput) (string, error) {
+	client := &http.Client{Timeout: time.Second * 10}
+	c, err := s.findSubCmd(ui)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := s.setupRequest(c, ui)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	msg, err := s.processResponse(c, resp)
+	if err != nil {
+		return "", err
+	}
+
+	return msg, nil
+}
+
 // findSubCmd maps the input command into a client service command by doing
 // a check of the command pattern.
 func (sc Commands) findSubCmd(c *UserInput) (*Command, error) {
@@ -331,19 +359,97 @@ func (sc Commands) findSubCmd(c *UserInput) (*Command, error) {
 	return nil, errors.New("unable to find a valid subcommand from the input command")
 }
 
-//check will perform a lookup of a raw arg value against a filter list to see if it is
-// allowed.
-func (a Arg) check(ra string) error {
-	if !a.FilterEnabled {
-		return nil
-	}
-	for _, val := range a.Filter {
-		if val == ra {
-			return nil
-		}
+// processResponse processes the client service command output based on the criteria
+// specified for the command.
+func (s Service) processResponse(c *Command, resp *http.Response) (string, error) {
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
 	}
 
-	return fmt.Errorf("invalid or blacklisted value \"%s\" for arg", ra)
+	if c.Response.Type == PlainTextResponse {
+		return string(bodyBytes), nil
+	}
+
+	output, err := gabs.ParseJSON(bodyBytes)
+	if err != nil {
+		return "", err
+	}
+
+	var respPath string
+	switch resp.StatusCode {
+	case http.StatusOK:
+		respPath = c.Response.Success.Path
+	default:
+		respPath = c.Response.Error.Path
+	}
+	msg := output.Path(respPath).String()
+
+	return msg, nil
+}
+
+// setupRequest prepares for the client service command request by parsing the user command.
+// Preprocessing is then preformed to prepare the request based on the criteria specified for
+// the command.
+func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) {
+	query, err := c.queryString(ui)
+	if err != nil {
+		return nil, err
+	}
+	json, err := c.jsonString(ui)
+	if err != nil {
+		return nil, err
+	}
+	endpoint, err := c.endpointString(ui)
+	if err != nil {
+		return nil, err
+	}
+
+	var serializedJson *bytes.Buffer = bytes.NewBuffer([]byte{})
+	// check if any json args exist for the given command
+	if len(json) > 0 {
+		serializedJson = bytes.NewBuffer([]byte(json))
+	}
+
+	req, err := http.NewRequest(strings.ToUpper(c.Method), s.BaseURI+path.Join(c.Endpoint, endpoint), serializedJson)
+	if err != nil {
+		return nil, err
+	}
+	req.URL.RawQuery = query
+	if len(json) != 0 {
+		req.Header.Add("Content-Type", "application/json")
+	}
+
+	switch c.Response.Type {
+	case PlainTextResponse:
+		req.Header.Add("Accept", "text/plain")
+	case JsonResponse:
+		req.Header.Add("Accept", "application/json")
+	}
+
+	return req, nil
+}
+
+// endpointString aggregates all of the endpoint arguments into the endpoint URL
+func (sc Command) endpointString(c *UserInput) (string, error) {
+	endpoint := []string{}
+	argCount := len((*sc.Args)[EndpointArg])
+	if argCount > len(c.Args) {
+		return "", errors.New("unable to parse input command due to invalid among of input args")
+	}
+
+	if argCount == 0 {
+		return "", nil
+	}
+
+	for idx, arg := range (*sc.Args)[EndpointArg] {
+		if err := arg.check(c.Args[idx]); err != nil {
+			return "", err
+		}
+		endpoint = append(endpoint, c.Args[idx])
+	}
+
+	return strings.Join(endpoint, "/"), nil
 }
 
 // queryString aggregates all of the query arguments from the input command.
@@ -374,6 +480,21 @@ func (sc Command) queryString(c *UserInput) (string, error) {
 	}
 
 	return query.Encode(), nil
+}
+
+// check will perform a lookup of a raw arg value against a filter list to see if it is
+// allowed.
+func (a Arg) check(ra string) error {
+	if !a.FilterEnabled {
+		return nil
+	}
+	for _, val := range a.Filter {
+		if val == ra {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid or blacklisted value \"%s\" for arg", ra)
 }
 
 // jsonString aggregates all of the json body arguments from the input command.
@@ -428,125 +549,4 @@ func (sc Command) jsonString(c *UserInput) (string, error) {
 	}
 
 	return json.String(), nil
-}
-
-// endpointString aggregates all of the endpoint arguments into the endpoint URL
-func (sc Command) endpointString(c *UserInput) (string, error) {
-	endpoint := []string{}
-	argCount := len((*sc.Args)[EndpointArg])
-	if argCount > len(c.Args) {
-		return "", errors.New("unable to parse input command due to invalid among of input args")
-	}
-
-	if argCount == 0 {
-		return "", nil
-	}
-
-	for idx, arg := range (*sc.Args)[EndpointArg] {
-		if err := arg.check(c.Args[idx]); err != nil {
-			return "", err
-		}
-		endpoint = append(endpoint, c.Args[idx])
-	}
-
-	return strings.Join(endpoint, "/"), nil
-}
-
-// Execute will push the command request to the associated client service and will
-// retrieve the output.
-func (s Service) Execute(ui *UserInput) (string, error) {
-	client := &http.Client{Timeout: time.Second * 10}
-	c, err := s.findSubCmd(ui)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := s.setupRequest(c, ui)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	defer resp.Body.Close()
-	msg, err := s.processResponse(c, resp)
-	if err != nil {
-		return "", err
-	}
-
-	return msg, nil
-}
-
-// setupRequest prepares for the client service command request by parsing the user command.
-// Preprocessing is then preformed to prepare the request based on the criteria specified for
-// the command.
-func (s Service) setupRequest(c *Command, ui *UserInput) (*http.Request, error) {
-	query, err := c.queryString(ui)
-	if err != nil {
-		return nil, err
-	}
-	json, err := c.jsonString(ui)
-	if err != nil {
-		return nil, err
-	}
-	endpoint, err := c.endpointString(ui)
-	if err != nil {
-		return nil, err
-	}
-
-	var serializedJson *bytes.Buffer = bytes.NewBuffer([]byte{})
-	// check if any json args exist for the given command
-	if len(json) > 0 {
-		serializedJson = bytes.NewBuffer([]byte(json))
-	}
-
-	req, err := http.NewRequest(strings.ToUpper(c.Method), s.BaseURI+path.Join(c.Endpoint, endpoint), serializedJson)
-	if err != nil {
-		return nil, err
-	}
-	req.URL.RawQuery = query
-	if len(json) != 0 {
-		req.Header.Add("Content-Type", "application/json")
-	}
-
-	switch c.Response.Type {
-	case PlainTextResponse:
-		req.Header.Add("Accept", "text/plain")
-	case JsonResponse:
-		req.Header.Add("Accept", "application/json")
-	}
-
-	return req, nil
-}
-
-// processResponse processes the client service command output based on the criteria
-// specified for the command.
-func (s Service) processResponse(c *Command, resp *http.Response) (string, error) {
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	if c.Response.Type == PlainTextResponse {
-		return string(bodyBytes), nil
-	}
-
-	output, err := gabs.ParseJSON(bodyBytes)
-	if err != nil {
-		return "", err
-	}
-
-	var respPath string
-	switch resp.StatusCode {
-	case http.StatusOK:
-		respPath = c.Response.Success.Path
-	default:
-		respPath = c.Response.Error.Path
-	}
-	msg := output.Path(respPath).String()
-
-	return msg, nil
 }
