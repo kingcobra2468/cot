@@ -39,7 +39,7 @@ func parseGVMS() (*config.GVMS, error) {
 
 // ping checks if COT is online.
 func ping(number string, gvc gvoice.GVoiceClient) error {
-	l := worker.NewGVoiceWorker(worker.Link{GVoiceNumber: "14159422253", ClientNumber: "14159422253"}, false, gvc)
+	l := worker.NewGVoiceWorker(worker.Link{GVoiceNumber: number, ClientNumber: number}, false, gvc)
 	if err := l.Send("ping"); err != nil {
 		glog.Error(err)
 		return nil
