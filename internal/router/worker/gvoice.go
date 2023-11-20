@@ -40,7 +40,6 @@ type GVoiceWorker struct {
 // minNumMessages is the minimum number of messages to fetch on the first iteration
 // when fetching the first conversation chunk.
 const minNumMessages uint64 = 5
-const pingOffset uint64 = 5
 
 // GenerateGVoiceWorkers creates a list of Worker instances from the configuration file. This
 // will also add each of the client numbers to the whitelist in the process.
@@ -182,7 +181,6 @@ func oldestNewText(texts *[]Text, timestamp uint64) (int, bool) {
 // Send sends a text message to the recipient.
 func (l *GVoiceWorker) Send(message string) error {
 	msg := l.encode(message)
-	// perform encryption of message if enabled
 	if l.encryption {
 		var err error
 		msg, err = crypto.Encrypt(l.link.ClientNumber, msg)
