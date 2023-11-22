@@ -1,4 +1,4 @@
-FROM golang:1.17
+FROM golang:1.21.2
 
 ARG cot_text_encryption=false
 ARG cot_public_key_file=
