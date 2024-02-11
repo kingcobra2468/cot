@@ -1,0 +1,13 @@
+with-expecter: true
+dir: "{{.InterfaceDir}}/mocks"
+outpkg: "mocks"
+mockname: "{{.InterfaceName}}"
+filename: "{{.InterfaceNameSnake}}.go"
+
+packages:
+  github.com/kingcobra2468/cot/internal/router:
+    interfaces:
+      Worker:
+  github.com/kingcobra2468/cot/internal/router/worker/gvoice:
+    interfaces:
+      GVoiceClient:

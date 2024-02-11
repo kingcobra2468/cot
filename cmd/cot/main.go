@@ -6,13 +6,15 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/kingcobra2468/cot/internal/config"
+	"github.com/kingcobra2468/cot/internal/router"
+	"github.com/kingcobra2468/cot/internal/router/worker"
+	"github.com/kingcobra2468/cot/internal/router/worker/crypto"
+	"github.com/kingcobra2468/cot/internal/router/worker/gvoice"
 	"github.com/kingcobra2468/cot/internal/service"
-	"github.com/kingcobra2468/cot/internal/text"
-	"github.com/kingcobra2468/cot/internal/text/crypto"
-	"github.com/kingcobra2468/cot/internal/text/gvoice"
 	"github.com/spf13/viper"
 )
 
@@ -93,7 +95,7 @@ func main() {
 		glog.Fatalln(err)
 	}
 	// register gvms connection config with gvms client
-	gvoice.Setup(gvms)
+	gvc := gvoice.New(gvms)
 
 	// read in gvms config and check integrity
 	encryption, err := parseEncryption()
@@ -119,9 +121,12 @@ func main() {
 	serviceCache := service.NewCache()
 	serviceCache.Add(services...)
 
-	listeners := text.GenerateListeners(sc)
-	commandExecutor := text.NewExecutor(5, len(*listeners), serviceCache)
-	commandExecutor.AddRecipient((*listeners)...)
+	textWorkers := worker.GenerateGVoiceWorkers(sc, gvc)
+	commandExecutor := router.NewEventLoop(5, len(*textWorkers), time.Second*10, serviceCache)
+
+	for _, w := range *textWorkers {
+		commandExecutor.AddWorker(w)
+	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

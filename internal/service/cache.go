@@ -45,7 +45,7 @@ func (c *Cache) Get(name string) (*sync.Pool, error) {
 	return nil, errInvalidService
 }
 
-// Services fetches a list of service names registed within the Cache.
+// Services fetches a list of service names registered within the Cache.
 func (c *Cache) Services() []string {
 	names := make([]string, 0, len(c.cache))
 	for name := range c.cache {
